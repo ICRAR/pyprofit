@@ -25,23 +25,29 @@ import os
 import glob
 from distutils import ccompiler
 
-# For the time being we use GSL to satisfy our needs
-# Does numpy come with something similar perhaps?
-compiler = ccompiler.new_compiler()
-if not compiler.has_function('gsl_sf_beta',libraries=('gsl','gslcblas')):
-    raise Exception("")
-
-
+# Our module
 pyprofit_sources = ['pyprofit.c']
-pyprofit_sources += glob.glob('src/*.c')
+
+# libprofit sources
+pyprofit_sources += glob.glob('libprofit/src/*.c')
+
+# gsl sources
+pyprofit_sources += glob.glob('gsl/specfunc/*.c')
+pyprofit_sources += glob.glob('gsl/cdf/*.c')
+pyprofit_sources += glob.glob('gsl/complex/*.c')
+pyprofit_sources += glob.glob('gsl/randist/*.c')
+pyprofit_sources += glob.glob('gsl/err/*.c')
+pyprofit_sources += glob.glob('gsl/sys/*.c')
+
+incdirs = ['libprofit/include',
+           'gsl', 'gsl/specfunc', 'gsl/cdf', 'gsl/complex']
 pyprofit_ext = Extension('pyprofit',
                        sources = pyprofit_sources,
-                       include_dirs = ['include'],
-                       libraries=['gsl', 'gslcblas'])
+                       include_dirs = incdirs)
 
 setup(
       name='pyprofit',
-      version='0.1.1',
+      version='0.2',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
