@@ -1,0 +1,8 @@
+dist
+build
+pyprofit.so
+*.egg-info
+.project
+.pydevproject
+tmp
+a.out
