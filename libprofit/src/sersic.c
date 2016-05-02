@@ -2,7 +2,7 @@
  * Sersic profile implementation
  *
  * ICRAR - International Centre for Radio Astronomy Research
- * (c) UWA - The University of Western Australia, 2014
+ * (c) UWA - The University of Western Australia, 2016
  * Copyright by UWA (in the framework of the ICRAR)
  * All rights reserved
  *
@@ -49,7 +49,7 @@ double profit_sumpix(double xcen, double ycen, double xlim0, double xlim1, doubl
 			xmod=rad*sin(angmod);
 			ymod=rad*cos(angmod);
 			xmod=xmod/axrat;
-			radmod=pow(pow(fabs(xmod),2+box)+pow(fabs(ymod),2+box),1/(2+box));
+			radmod=pow(pow(fabs(xmod),box)+pow(fabs(ymod),box),1/(box));
 			addval=exp(-bn*(pow(radmod/re,1/nser)-1));
 			if( j > 0 && recur < 3 ){
 				if( (addval/prevaddval > (1+acc)) || (addval/prevaddval < 1/(1+acc)) ){
@@ -76,7 +76,7 @@ int _sersic_at_xy(profit_sersic_profile *sp,
 	double angrad = -sp->ang * M_PI/180;
 	double re   = sp->re;
 	double nser = sp->nser;
-	double box  = sp->box;
+	double box  = sp->box + 2;
 	double xbin = model->xbin;
 	double ybin = model->ybin;
 	/* unsigned int depth = 0; */
@@ -89,7 +89,7 @@ int _sersic_at_xy(profit_sersic_profile *sp,
 	double angmod = atan2(x-sp->xcen, y-sp->ycen) - angrad;
 	double xmod = rad * sin(angmod) / sp->axrat;
 	double ymod = rad * cos(angmod);
-	double radmod = pow( pow(fabs(xmod),2+box)+pow(fabs(ymod),2+box), 1/(2+box));
+	double radmod = pow( pow(fabs(xmod),box) + pow(fabs(ymod),box), 1/(box));
 
 	unsigned int upscale = 4;
 

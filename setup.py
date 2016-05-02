@@ -39,15 +39,14 @@ pyprofit_sources += glob.glob('gsl/randist/*.c')
 pyprofit_sources += glob.glob('gsl/err/*.c')
 pyprofit_sources += glob.glob('gsl/sys/*.c')
 
-incdirs = ['libprofit/include',
-           'gsl', 'gsl/specfunc', 'gsl/cdf', 'gsl/complex']
+incdirs = ['libprofit/include', 'gsl']
 pyprofit_ext = Extension('pyprofit',
                        sources = pyprofit_sources,
                        include_dirs = incdirs)
 
 setup(
       name='pyprofit',
-      version='0.2.1',
+      version='0.3.0',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
