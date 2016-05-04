@@ -26,6 +26,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "sersic.h"
 
@@ -162,7 +163,7 @@ void profit_make_sersic(profit_profile *profile, profit_model *model, double *im
 
 }
 
-int profit_init_sersic(profit_profile *profile, profit_model *model) {
+void profit_init_sersic(profit_profile *profile, profit_model *model) {
 
 	profit_sersic_profile *sersic_p = (profit_sersic_profile *)profile;
 	double nser = sersic_p->nser;
@@ -173,8 +174,17 @@ int profit_init_sersic(profit_profile *profile, profit_model *model) {
 	double magzero = model->magzero;
 	double bn;
 
-	if( sersic_p->_qgamma == NULL || sersic_p->_gammafn == NULL || sersic_p->_beta == NULL ) {
-		return 1;
+	if( !sersic_p->_qgamma ) {
+		profile->error = strdup("Missing qgamma function on sersic profile");
+		return;
+	}
+	if( !sersic_p->_gammafn ) {
+		profile->error = strdup("Missing gamma function on sersic profile");
+		return;
+	}
+	if( !sersic_p->_beta ) {
+		profile->error = strdup("Missing beta function on sersic profile");
+		return;
 	}
 
 	/*
@@ -187,7 +197,7 @@ int profit_init_sersic(profit_profile *profile, profit_model *model) {
 	double lumtot = pow(re, 2) * 2 * M_PI * nser * gamma * axrat/Rbox * exp(bn)/pow(bn, 2*nser);
 	sersic_p->Ie = pow(10, -0.4*(mag-magzero))/lumtot;
 
-	return 0;
+	return;
 }
 
 profit_profile *profit_create_sersic() {

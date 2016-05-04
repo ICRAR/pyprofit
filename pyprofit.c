@@ -105,6 +105,8 @@ static profit_profile** _read_sersic_profiles(PyObject *model_dict, unsigned int
 
 static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
+	unsigned int i, j;
+
 	PyObject *model_dict;
 	if( !PyArg_ParseTuple(args, "O!", &PyDict_Type, &model_dict) ) {
 		return NULL;
@@ -134,7 +136,8 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	profit_profile **sersic_profiles = _read_sersic_profiles(model_dict, &n_sersic);
 	profit_profile **sky_profiles = _read_sky_profiles(model_dict, &n_sky);
 
-	profit_model *m = profit_get_model(1);
+	profit_model *m = (profit_model *)calloc(1, sizeof(profit_model));
+	m->error = NULL;
 	m->width = width;
 	m->height = height;
 	m->res_x = width;
@@ -143,17 +146,20 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	/* Assign the individual profiles */
 	m->n_profiles = n_sersic + n_sky;
 	m->profiles = (profit_profile **)malloc(sizeof(profit_profile *) * m->n_profiles);
-	for(unsigned int i=0; i!=n_sersic; i++) {
+	for(i=0; i!=n_sersic; i++) {
 		m->profiles[i] = sersic_profiles[i];
 	}
-	for(unsigned int i=0; i!=n_sky; i++) {
+	for(i=0; i!=n_sky; i++) {
 		m->profiles[n_sersic + i] = sky_profiles[i];
 	}
+	free(sersic_profiles);
+	free(sky_profiles);
 
 	PyObject *magzero = PyDict_GetItemString(model_dict, "magzero");
 	if( magzero != NULL ) {
 		m->magzero = PyFloat_AsDouble(magzero);
 		if( PyErr_Occurred() ) {
+			profit_cleanup(m);
 			return NULL;
 		}
 	}
@@ -162,13 +168,21 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	 * Go, Go, Go!
 	 * This might take a few [ms], so we release the GIL
 	 */
-	int result;
 	Py_BEGIN_ALLOW_THREADS
-	result = profit_make_model(m);
+	profit_make_model(m);
 	Py_END_ALLOW_THREADS
 
-	if( result == 1 ) {
-		PYPROFIT_RAISE("Error on profile initialization");
+	if( m->error ) {
+		PyErr_SetString(profit_error, m->error);
+		profit_cleanup(m);
+		return NULL;
+	}
+	for(i=0; i!=m->n_profiles; i++) {
+		if( m->profiles[i]->error ) {
+			PyErr_SetString(profit_error, m->profiles[i]->error);
+			profit_cleanup(m);
+			return NULL;
+		}
 	}
 
 	/* Copy resulting image into a 2-D tuple */
@@ -177,13 +191,12 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 		PYPROFIT_RAISE("Couldn't create return tuple");
 	}
 
-	for(unsigned int i=0; i!=m->height; i++) {
+	for(i=0; i!=m->height; i++) {
 		PyObject *row_tuple = PyTuple_New(m->width);
 		if( row_tuple == NULL ) {
-			PyErr_SetString(profit_error, "Couldn't create row tuple");
-			return NULL;
+			PYPROFIT_RAISE("Couldn't create row tuple");
 		}
-		for(unsigned int j=0; j!=m->width; j++) {
+		for(j=0; j!=m->width; j++) {
 			PyObject *val = PyFloat_FromDouble(m->image[i*m->width + j]);
 			PyTuple_SetItem(row_tuple, j, val);
 		}
@@ -191,13 +204,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	}
 
 	/* Clean up and return */
-	free(m->image);
-	for(unsigned i=0; i!=m->n_profiles; i++) {
-		free(m->profiles[i]);
-	}
-	free(m->profiles);
-	free(m);
-
+	profit_cleanup(m);
 	return image_tuple;
 }
 
