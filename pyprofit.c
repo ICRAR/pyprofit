@@ -41,9 +41,15 @@
 	} while (0)
 
 #define READ_DOUBLE_INTO(key, dst) \
-  	val = PyDict_GetItemString(item, key); \
+	val = PyDict_GetItemString(item, key); \
 	if( val != NULL ) { \
 		dst = PyFloat_AsDouble(val); \
+	}
+
+#define READ_SHORT_INTO(key, dst) \
+	val = PyDict_GetItemString(item, key); \
+	if( val != NULL ) { \
+		dst = (short)PyInt_AsLong(val); \
 	}
 
 /* Exceptions */
@@ -65,6 +71,7 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_DOUBLE_INTO("ang",   s->ang);
 	READ_DOUBLE_INTO("axrat", s->axrat);
 	READ_DOUBLE_INTO("box",   s->box);
+	READ_SHORT_INTO("rough",  s->rough);
 }
 
 static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {

@@ -97,7 +97,7 @@ int _sersic_at_xy(profit_sersic_profile *sp,
 	/*
 	 * No need for further refinement, return sersic profile
 	 */
-	if( radmod > 2*re ){
+	if( sp->rough || radmod > 2*re ){
 		*result = exp( -sp->bn * (pow(radmod/re, 1/nser) - 1) );
 		*result *= xbin*ybin*sp->Ie;
 		return 0;
@@ -214,6 +214,7 @@ profit_profile *profit_create_sersic() {
 	p->box = 0;
 	p->ang   = 0.0;
 	p->axrat = 1.;
+	p->rough = 0;
 	p->_qgamma = NULL;
 	p->_gammafn = NULL;
 	p->_beta = NULL;
