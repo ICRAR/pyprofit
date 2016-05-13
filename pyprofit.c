@@ -113,6 +113,7 @@ static profit_profile** _read_sersic_profiles(PyObject *model_dict, unsigned int
 static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	unsigned int i, j;
+	char *error;
 
 	PyObject *model_dict;
 	if( !PyArg_ParseTuple(args, "O!", &PyDict_Type, &model_dict) ) {
@@ -177,19 +178,13 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	 */
 	Py_BEGIN_ALLOW_THREADS
 	profit_make_model(m);
+	error = profit_get_error(m);
 	Py_END_ALLOW_THREADS
 
-	if( m->error ) {
+	if( error ) {
 		PyErr_SetString(profit_error, m->error);
 		profit_cleanup(m);
 		return NULL;
-	}
-	for(i=0; i!=m->n_profiles; i++) {
-		if( m->profiles[i]->error ) {
-			PyErr_SetString(profit_error, m->profiles[i]->error);
-			profit_cleanup(m);
-			return NULL;
-		}
 	}
 
 	/* Copy resulting image into a 2-D tuple */
