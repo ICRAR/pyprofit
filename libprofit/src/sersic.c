@@ -48,8 +48,8 @@ static inline
 void _sersic_translate_rotate(profit_sersic_profile *sp, double x, double y, double *x_ser, double *y_ser) {
 	x -= sp->xcen;
 	y -= sp->ycen;
-	*x_ser = x * sp->_cos_ang + y * sp->_sin_ang;
-	*y_ser = (x * sp->_sin_ang - y * sp->_cos_ang) / sp->axrat;
+	*x_ser = x * sp->_cos_ang - y * sp->_sin_ang;
+	*y_ser = (x * sp->_sin_ang + y * sp->_cos_ang) / sp->axrat;
 }
 
 static
@@ -154,7 +154,7 @@ void profit_init_sersic(profit_profile *profile, profit_model *model) {
 	double mag = sersic_p->mag;
 	double box = sersic_p->box + 2;
 	double magzero = model->magzero;
-	double bn, angrad, cos_ang;
+	double bn, angrad;
 
 	if( !sersic_p->_qgamma ) {
 		profile->error = strdup("Missing qgamma function on sersic profile");
@@ -184,10 +184,17 @@ void profit_init_sersic(profit_profile *profile, profit_model *model) {
 	 * Get the rotation angle in radians and calculate the coefficients
 	 * that will fill the rotation matrix we'll use later to transform
 	 * from image coordinates into sersic coordinates.
+	 *
+	 * In galfit the angle started from the Y image axis.
 	 */
-	angrad = fmod(sersic_p->ang, 360.) * M_PI / 180.;
-	sersic_p->_cos_ang = cos_ang = cos(angrad);
-	sersic_p->_sin_ang = sqrt(1. - cos_ang * cos_ang) * (angrad < M_PI ? -1. : 1.); /* cos^2 + sin^2 = 1 */
+	angrad = fmod(sersic_p->ang + 90, 360.) * M_PI / 180.;
+	sersic_p->_cos_ang = cos(angrad);
+	sersic_p->_sin_ang = sin(angrad);
+
+	/* Other way to get sin is doing: cos^2 + sin^2 = 1
+	 * sersic_p->_sin_ang = sqrt(1. - cos_ang * cos_ang) * (angrad < M_PI ? -1. : 1.);
+	 * The performance seems pretty similar though, and doing sin() is more readable
+	 */
 
 }
 
