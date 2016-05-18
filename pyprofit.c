@@ -58,6 +58,14 @@
 		} \
 	} while(0)
 
+#define READ_UNSIGNED_INT_INTO(key, dst) \
+	do { \
+		PyObject *tmp = PyDict_GetItemString(item, key); \
+		if( tmp != NULL ) { \
+			dst = (unsigned int)PyInt_AsUnsignedLongMask(tmp); \
+		} \
+	} while(0)
+
 /* Exceptions */
 static PyObject *profit_error;
 
@@ -77,6 +85,10 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_DOUBLE_INTO("axrat", s->axrat);
 	READ_DOUBLE_INTO("box",   s->box);
 	READ_BOOL_INTO("rough",  s->rough);
+	READ_DOUBLE_INTO("acc",   s->acc);
+	READ_DOUBLE_INTO("re_switch", s->re_switch);
+	READ_UNSIGNED_INT_INTO("resolution", s->resolution);
+	READ_UNSIGNED_INT_INTO("max_recursions", s->max_recursions);
 }
 
 static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {

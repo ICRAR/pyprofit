@@ -46,10 +46,10 @@ struct _profit_profile_index _all_profiles[] = {
 	{"sky",    profit_create_sky},
 	{"sersic", profit_create_sersic},
 	{"psf",    profit_create_psf},
-	{NULL, NULL, NULL} // Sentinel
+	{NULL, NULL} // Sentinel
 };
 
-profit_profile* profit_get_profile(const char const * name) {
+profit_profile* profit_get_profile(const char * name) {
 
 	struct _profit_profile_index *p = _all_profiles;
 	while(1) {
