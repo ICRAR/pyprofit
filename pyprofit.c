@@ -103,39 +103,34 @@ static void _item_to_psf_profile(profit_profile *profile, PyObject *item) {
 	READ_DOUBLE_INTO("mag",   psf->mag);
 }
 
-static profit_profile** _read_profiles(PyObject *profiles_dict, unsigned int *n_profiles, const char *name, void (item_to_profile)(profit_profile *, PyObject *item)) {
+void _read_profiles(profit_model *model, PyObject *profiles_dict, const char *name, void (item_to_profile)(profit_profile *, PyObject *item)) {
 
 	PyObject *profile_sequence = PyDict_GetItemString(profiles_dict, name);
 	if( profile_sequence == NULL ) {
-		*n_profiles = 0;
-		return NULL;
+		return;
 	}
-	Py_ssize_t length = PySequence_Size(profile_sequence);
 
-	*n_profiles = (unsigned int)length;
-	profit_profile **profiles = (profit_profile **)malloc(sizeof(profit_profile *) * *n_profiles);
+	Py_ssize_t length = PySequence_Size(profile_sequence);
 	for(Py_ssize_t i = 0; i!= length; i++) {
 		PyObject *item = PySequence_GetItem(profile_sequence, i);
-		profit_profile *p = profit_get_profile(name);
-		profiles[i] = p;
+		profit_profile *p = profit_create_profile(name);
 		item_to_profile(p, item);
 		READ_BOOL_INTO("convolve", p->convolve);
+		profit_add_profile(model, p);
 		Py_DECREF(item);
 	}
-
-	return profiles;
 }
 
-static profit_profile** _read_psf_profiles(PyObject *profiles_dict, unsigned int *n_profiles) {
-	return _read_profiles(profiles_dict, n_profiles, "psf", &_item_to_psf_profile);
+static void _read_psf_profiles(profit_model *model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "psf", &_item_to_psf_profile);
 }
 
-static profit_profile** _read_sky_profiles(PyObject *profiles_dict, unsigned int *n_profiles) {
-	return _read_profiles(profiles_dict, n_profiles, "sky", &_item_to_sky_profile);
+static void _read_sky_profiles(profit_model *model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "sky", &_item_to_sky_profile);
 }
 
-static profit_profile** _read_sersic_profiles(PyObject *profiles_dict, unsigned int *n_profiles) {
-	return _read_profiles(profiles_dict, n_profiles, "sersic", &_item_to_sersic_profile);
+static void _read_sersic_profiles(profit_model *model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "sersic", &_item_to_sersic_profile);
 }
 
 static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned int *psf_height) {
@@ -229,15 +224,8 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 		return NULL;
 	}
 
-	/* Read the profiles */
-	unsigned int n_sersic;
-	unsigned int n_sky;
-	unsigned int n_psf;
-	profit_profile **sersic_profiles = _read_sersic_profiles(profiles_dict, &n_sersic);
-	profit_profile **sky_profiles = _read_sky_profiles(profiles_dict, &n_sky);
-	profit_profile **psf_profiles = _read_psf_profiles(profiles_dict, &n_psf);
-
-	profit_model *m = (profit_model *)calloc(1, sizeof(profit_model));
+	/* Create and initialize the model */
+	profit_model *m = profit_create_model();
 	m->width = width;
 	m->height = height;
 	m->res_x = width;
@@ -245,22 +233,6 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	m->psf = psf;
 	m->psf_width = psf_width;
 	m->psf_height = psf_height;
-
-	/* Assign the individual profiles */
-	m->n_profiles = n_sersic + n_sky + n_psf;
-	m->profiles = (profit_profile **)malloc(sizeof(profit_profile *) * m->n_profiles);
-	for(i=0; i!=n_sersic; i++) {
-		m->profiles[i] = sersic_profiles[i];
-	}
-	for(i=0; i!=n_sky; i++) {
-		m->profiles[n_sersic + i] = sky_profiles[i];
-	}
-	for(i=0; i!=n_psf; i++) {
-		m->profiles[n_sersic + n_sky + i] = psf_profiles[i];
-	}
-	free(sersic_profiles);
-	free(sky_profiles);
-
 	PyObject *magzero = PyDict_GetItemString(model_dict, "magzero");
 	if( magzero != NULL ) {
 		m->magzero = PyFloat_AsDouble(magzero);
@@ -270,12 +242,17 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 		}
 	}
 
+	/* Read the profiles */
+	_read_sersic_profiles(m, profiles_dict);
+	_read_sky_profiles(m, profiles_dict);
+	_read_psf_profiles(m, profiles_dict);
+
 	/*
 	 * Go, Go, Go!
 	 * This might take a few [ms], so we release the GIL
 	 */
 	Py_BEGIN_ALLOW_THREADS
-	profit_make_model(m);
+	profit_eval_model(m);
 	error = profit_get_error(m);
 	Py_END_ALLOW_THREADS
 

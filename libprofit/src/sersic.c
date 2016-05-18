@@ -34,7 +34,7 @@ static inline
 double _sersic_for_xy_r(profit_sersic_profile *sp,
                         double x, double y,
                         double r, bool reuse_r) {
-	if( sp->box ) {
+	if( sp->box != 0. ) {
 		double box = sp->box + 2.;
 		r = pow( pow(fabs(x), box) + pow(fabs(y), box), 1./box);
 	}
