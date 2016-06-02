@@ -89,6 +89,7 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_DOUBLE_INTO("re_switch", s->re_switch);
 	READ_UNSIGNED_INT_INTO("resolution", s->resolution);
 	READ_UNSIGNED_INT_INTO("max_recursions", s->max_recursions);
+	READ_UNSIGNED_INT_INTO("adjust", s->adjust);
 }
 
 static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {
