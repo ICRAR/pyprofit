@@ -72,10 +72,6 @@ static PyObject *profit_error;
 /* Methods */
 static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	profit_sersic_profile *s = (profit_sersic_profile *)profile;
-	s->_beta = &gsl_sf_beta;
-	s->_gammafn = &gsl_sf_gamma;
-	s->_qgamma = &gsl_cdf_gamma_Qinv;
-
 	READ_DOUBLE_INTO("xcen",  s->xcen);
 	READ_DOUBLE_INTO("ycen",  s->ycen);
 	READ_DOUBLE_INTO("mag",   s->mag);
@@ -84,12 +80,17 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_DOUBLE_INTO("ang",   s->ang);
 	READ_DOUBLE_INTO("axrat", s->axrat);
 	READ_DOUBLE_INTO("box",   s->box);
+
 	READ_BOOL_INTO("rough",  s->rough);
 	READ_DOUBLE_INTO("acc",   s->acc);
 	READ_DOUBLE_INTO("re_switch", s->re_switch);
 	READ_UNSIGNED_INT_INTO("resolution", s->resolution);
 	READ_UNSIGNED_INT_INTO("max_recursions", s->max_recursions);
-	READ_UNSIGNED_INT_INTO("adjust", s->adjust);
+
+	READ_DOUBLE_INTO("re_switch", s->re_switch);
+	READ_BOOL_INTO("rescale_flux", s->rescale_flux);
+
+	READ_BOOL_INTO("adjust", s->adjust);
 }
 
 static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {
