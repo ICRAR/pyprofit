@@ -173,6 +173,11 @@ void profit_make_sersic(profit_profile *profile, profit_model *model, double *im
 		for(i=0; i < model->width; i++) {
 			x += half_xbin;
 
+			/* We were instructed, we were instructed to ignore this pixel */
+			if( sp->calcmask && !sp->calcmask[i + j*model->width] ) {
+				continue;
+			}
+
 			_image_to_sersic_coordinates(sp, x, y, &x_ser, &y_ser);
 
 			/*
@@ -359,6 +364,8 @@ profit_profile *profit_create_sersic() {
 
 	p->re_max = 0;
 	p->rescale_flux = false;
+
+	p->calcmask = NULL;
 
 	/*
 	 * Point to the corresponding implementation, or leave as NULL if not

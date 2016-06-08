@@ -70,6 +70,57 @@
 static PyObject *profit_error;
 
 /* Methods */
+static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, unsigned int *matrix_height) {
+
+	bool *bools = NULL;
+	Py_ssize_t width = 0, height = 0;
+
+	if( matrix == NULL ) {
+		*matrix_width = 0;
+		*matrix_height = 0;
+		return NULL;
+	}
+
+	height = PySequence_Size(matrix);
+	for(Py_ssize_t j = 0; j!=height; j++) {
+		PyObject *row = PySequence_GetItem(matrix, j);
+		if( row == NULL ) {
+			free(bools);
+			return NULL;
+		}
+
+		/* All rows should have the same width */
+		if( j == 0 ) {
+			width = PySequence_Size(row);
+			*matrix_height = (unsigned int)height;
+			*matrix_width = (unsigned int)width;
+			bools = (bool *)malloc(sizeof(bool) * *matrix_width * *matrix_height);
+		}
+		else {
+			if( PySequence_Size(row) != width ) {
+				Py_DECREF(row);
+				free(bools);
+				return NULL;
+			}
+		}
+
+		/* Finally assign the individual values */
+		for(Py_ssize_t i=0; i!=width; i++) {
+			PyObject *cell = PySequence_GetItem(row, i);
+			if( cell == NULL ) {
+				Py_DECREF(row);
+				free(bools);
+				return NULL;
+			}
+			bools[i + j*width] = (bool)PyObject_IsTrue(cell);
+			Py_DECREF(cell);
+		}
+		Py_DECREF(row);
+	}
+
+	return bools;
+}
+
 static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	profit_sersic_profile *s = (profit_sersic_profile *)profile;
 	READ_DOUBLE_INTO("xcen",  s->xcen);
@@ -91,6 +142,9 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_BOOL_INTO("rescale_flux", s->rescale_flux);
 
 	READ_BOOL_INTO("adjust", s->adjust);
+
+	unsigned int cm_w, cm_h;
+	s->calcmask = _read_boolean_matrix(PyDict_GetItemString(item, "calcmask"), &cm_w, &cm_h);
 }
 
 static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {

@@ -227,6 +227,12 @@ void profit_cleanup(profit_model *m) {
 
 	for(i=0; i!=m->n_profiles; i++) {
 		p = m->profiles[i];
+
+		/* We should probably have a destruction method on each profile... */
+		if( !strcmp(p->name, "sersic") ) {
+			free(((profit_sersic_profile *)p)->calcmask);
+		}
+
 		free(p->error);
 		free(p);
 	}
