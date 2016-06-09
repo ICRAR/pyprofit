@@ -6,3 +6,4 @@ pyprofit.so
 .pydevproject
 tmp
 a.out
+*.pyc
