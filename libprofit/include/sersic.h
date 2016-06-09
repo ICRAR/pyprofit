@@ -60,11 +60,6 @@ typedef struct _profit_sersic_profile {
 	double re_max;
 	bool rescale_flux;
 
-	/*
-	 * Used to limit the profile calculation only to a given area
-	 */
-	bool *calcmask;
-
 	/* Gamma function and distribution to use */
 	double (*_qgamma)(double p, double shape);
 	double (*_pgamma)(double q, double shape);

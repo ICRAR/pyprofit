@@ -38,7 +38,7 @@ import numpy as np
 class Data(object):
     pass
 
-def to_pyprofit_image(params, data):
+def to_pyprofit_image(params, data, use_mask=True):
 
     # merge, un-sigma all, un-log some
     sigmas_tofit = data.sigmas[data.tofit]
@@ -46,12 +46,10 @@ def to_pyprofit_image(params, data):
     allparams[data.tofit] = params * sigmas_tofit
     allparams[data.tolog] = 10**allparams[data.tolog]
 
-    fields = ['xcen','ycen','mag','re','nser','ang','axrat','box','calcregion']
+    fields = ['xcen','ycen','mag','re','nser','ang','axrat','box']
     s1params = [x for i,x in enumerate(allparams) if i%2 == 0]
-    s1params.append(data.calcregion)
     s2params = [x for i,x in enumerate(allparams) if i%2 != 0]
-    s2params.append(data.calcregion)
-    if hasattr(data, 'psf'):
+    if hasattr(data, 'psf') and len(data.psf) > 0:
         fields.append('convolve')
         s1params.append(True)
         s2params.append(True)
@@ -66,6 +64,8 @@ def to_pyprofit_image(params, data):
                     'psf': data.psf,
                     'profiles': {'sersic': sparams}
                    }
+    if use_mask:
+        profit_model['calcmask'] = data.calcregion
     return allparams, np.array(pyprofit.make_model(profit_model))
 
 

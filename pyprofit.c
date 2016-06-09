@@ -142,9 +142,6 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_BOOL_INTO("rescale_flux", s->rescale_flux);
 
 	READ_BOOL_INTO("adjust", s->adjust);
-
-	unsigned int cm_w, cm_h;
-	s->calcmask = _read_boolean_matrix(PyDict_GetItemString(item, "calcmask"), &cm_w, &cm_h);
 }
 
 static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {
@@ -244,8 +241,10 @@ static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned
 static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	unsigned int i, j, psf_width = 0, psf_height = 0;
+	unsigned int mask_w = 0, mask_h = 0;
 	char *error;
 	double *psf;
+	bool *calcmask;
 
 	PyObject *model_dict;
 	if( !PyArg_ParseTuple(args, "O!", &PyDict_Type, &model_dict) ) {
@@ -279,6 +278,13 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	if( PyErr_Occurred() ) {
 		return NULL;
 	}
+	calcmask = _read_boolean_matrix(PyDict_GetItemString(model_dict, "calcmask"), &mask_w, &mask_h);
+	if( PyErr_Occurred() ) {
+		return NULL;
+	}
+	if( calcmask && (mask_w != width || mask_h != height) ) {
+		PYPROFIT_RAISE("calcmask must have same dimensions of image");
+	}
 
 	/* Create and initialize the model */
 	profit_model *m = profit_create_model();
@@ -289,6 +295,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	m->psf = psf;
 	m->psf_width = psf_width;
 	m->psf_height = psf_height;
+	m->calcmask = calcmask;
 	PyObject *magzero = PyDict_GetItemString(model_dict, "magzero");
 	if( magzero != NULL ) {
 		m->magzero = PyFloat_AsDouble(magzero);

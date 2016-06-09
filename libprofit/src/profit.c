@@ -53,6 +53,7 @@ profit_model *profit_create_model() {
 	profit_model *model = (profit_model *)calloc(1, sizeof(profit_model));
 	model->n_profiles = 0;
 	model->profiles = NULL;
+	model->calcmask = NULL;
 	return model;
 }
 
@@ -189,7 +190,7 @@ void profit_eval_model(profit_model *model) {
 		}
 	}
 	if( convolve ) {
-		profit_convolve(model->image, model->width, model->height, model->psf, model->psf_width, model->psf_height, true);
+		profit_convolve(model->image, model->width, model->height, model->psf, model->psf_width, model->psf_height, model->calcmask, true);
 	}
 	for(p=0; p != model->n_profiles; p++) {
 		if( !model->profiles[p]->convolve ) {
@@ -227,12 +228,6 @@ void profit_cleanup(profit_model *m) {
 
 	for(i=0; i!=m->n_profiles; i++) {
 		p = m->profiles[i];
-
-		/* We should probably have a destruction method on each profile... */
-		if( !strcmp(p->name, "sersic") ) {
-			free(((profit_sersic_profile *)p)->calcmask);
-		}
-
 		free(p->error);
 		free(p);
 	}
@@ -240,5 +235,6 @@ void profit_cleanup(profit_model *m) {
 	free(m->profiles);
 	free(m->image);
 	free(m->psf);
+	free(m->calcmask);
 	free(m);
 }
