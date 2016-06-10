@@ -92,10 +92,11 @@ def run():
 
     # Now result.x contains the optimal set of parameters
     # Plot the initial and final set of parameters to see the difference
-    _, modelim0 = to_pyprofit_image(data.init, data)
-    _,  modelim  = to_pyprofit_image(result.x, data)
+    _, modelim0 = to_pyprofit_image(data.init, data, use_mask=False)
+    _,  modelim  = to_pyprofit_image(result.x, data, use_mask=False)
     plot_image_comparison(data.image, modelim0, data.sigim, data.region)
     plot_image_comparison(data.image, modelim, data.sigim, data.region)
+    return result
 
 if __name__ == '__main__':
     run()
