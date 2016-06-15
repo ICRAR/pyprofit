@@ -128,7 +128,7 @@ double _sersic_sumpix(profit_sersic_profile *sp,
 			subval = _sersic_for_xy_r(sp, x_ser, y_ser, 0, false);
 
 			if( recurse ) {
-				testval = _sersic_for_xy_r(sp, x_ser, fabs(y_ser) + fabs(ybin*sp->_sin_ang/sp->re), 0, false);
+				testval = _sersic_for_xy_r(sp, x_ser, fabs(y_ser) + fabs(ybin*sp->_sin_ang), 0, false);
 				if( fabs(testval/subval - 1.0) > sp->acc ) {
 					subval = _sersic_sumpix(sp,
 					                        x - half_xbin, x + half_xbin,
