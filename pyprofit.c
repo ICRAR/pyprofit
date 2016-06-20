@@ -166,10 +166,9 @@ void _read_profiles(profit_model *model, PyObject *profiles_dict, const char *na
 	Py_ssize_t length = PySequence_Size(profile_sequence);
 	for(Py_ssize_t i = 0; i!= length; i++) {
 		PyObject *item = PySequence_GetItem(profile_sequence, i);
-		profit_profile *p = profit_create_profile(name);
+		profit_profile *p = profit_create_profile(model, name);
 		item_to_profile(p, item);
 		READ_BOOL_INTO("convolve", p->convolve);
-		profit_add_profile(model, p);
 		Py_DECREF(item);
 	}
 }
