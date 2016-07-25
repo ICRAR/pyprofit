@@ -26,20 +26,8 @@
 #ifndef _CONVOLUTION_H_
 #define _CONVOLUTION_H_
 
-#include <stdbool.h>
-
-#ifdef __cplusplus
-extern "C"
+namespace profit
 {
-#endif
-
-/**
- * Normalizes the values of image so their total sum is 1.
- *
- * The values are written back into the image, so if the original needs to be retained
- * then a copy should be supplied.
- */
-void profit_normalize(double *image, unsigned int img_width, unsigned int img_height);
 
 /**
  * Convolves image src with the kernel krn.
@@ -52,13 +40,11 @@ void profit_normalize(double *image, unsigned int img_width, unsigned int img_he
  * A mask parameter also controls which pixels from the original image should be
  * convolved. If NULL all pixels are convolved.
  */
-double *profit_convolve(double *src, unsigned int src_width, unsigned int src_height,
-                        double *krn, unsigned int krn_width, unsigned int krn_height,
-                        bool *mask, bool replace);
+double *convolve(double *src, unsigned int src_width, unsigned int src_height,
+                 double *krn, unsigned int krn_width, unsigned int krn_height,
+                 bool *mask, bool replace);
 
-#ifdef __cplusplus
-}
-#endif
+} /* namespace profit */
 
 #endif /* _CONVOLUTION_H_ */
 

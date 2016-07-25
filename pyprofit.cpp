@@ -25,7 +25,6 @@
  */
 
 #include <Python.h>
-#include <stdbool.h>
 
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_sf_gamma.h"
@@ -34,6 +33,8 @@
 #include "psf.h"
 #include "sersic.h"
 #include "sky.h"
+
+using namespace profit;
 
 /* Macros */
 #define PYPROFIT_RAISE(str) \
@@ -121,8 +122,8 @@ static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, 
 	return bools;
 }
 
-static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
-	profit_sersic_profile *s = (profit_sersic_profile *)profile;
+static void _item_to_sersic_profile(Profile *profile, PyObject *item) {
+	SersicProfile *s = static_cast<SersicProfile *>(profile);
 	READ_DOUBLE_INTO("xcen",  s->xcen);
 	READ_DOUBLE_INTO("ycen",  s->ycen);
 	READ_DOUBLE_INTO("mag",   s->mag);
@@ -144,19 +145,19 @@ static void _item_to_sersic_profile(profit_profile *profile, PyObject *item) {
 	READ_BOOL_INTO("adjust", s->adjust);
 }
 
-static void _item_to_sky_profile(profit_profile *profile, PyObject *item) {
-	profit_sky_profile *s = (profit_sky_profile *)profile;
+static void _item_to_sky_profile(Profile *profile, PyObject *item) {
+	SkyProfile *s = static_cast<SkyProfile *>(profile);
 	READ_DOUBLE_INTO("bg", s->bg);
 }
 
-static void _item_to_psf_profile(profit_profile *profile, PyObject *item) {
-	profit_psf_profile *psf = (profit_psf_profile *)profile;
+static void _item_to_psf_profile(Profile *profile, PyObject *item) {
+	PsfProfile *psf = static_cast<PsfProfile *>(profile);
 	READ_DOUBLE_INTO("xcen",  psf->xcen);
 	READ_DOUBLE_INTO("ycen",  psf->ycen);
 	READ_DOUBLE_INTO("mag",   psf->mag);
 }
 
-void _read_profiles(profit_model *model, PyObject *profiles_dict, const char *name, void (item_to_profile)(profit_profile *, PyObject *item)) {
+void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, void (item_to_profile)(Profile *, PyObject *item)) {
 
 	PyObject *profile_sequence = PyDict_GetItemString(profiles_dict, name);
 	if( profile_sequence == NULL ) {
@@ -166,22 +167,22 @@ void _read_profiles(profit_model *model, PyObject *profiles_dict, const char *na
 	Py_ssize_t length = PySequence_Size(profile_sequence);
 	for(Py_ssize_t i = 0; i!= length; i++) {
 		PyObject *item = PySequence_GetItem(profile_sequence, i);
-		profit_profile *p = profit_create_profile(model, name);
+		Profile *p = model.add_profile(name);
 		item_to_profile(p, item);
 		READ_BOOL_INTO("convolve", p->convolve);
 		Py_DECREF(item);
 	}
 }
 
-static void _read_psf_profiles(profit_model *model, PyObject *profiles_dict) {
+static void _read_psf_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "psf", &_item_to_psf_profile);
 }
 
-static void _read_sky_profiles(profit_model *model, PyObject *profiles_dict) {
+static void _read_sky_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "sky", &_item_to_sky_profile);
 }
 
-static void _read_sersic_profiles(profit_model *model, PyObject *profiles_dict) {
+static void _read_sersic_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "sersic", &_item_to_sersic_profile);
 }
 
@@ -241,7 +242,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	unsigned int i, j, psf_width = 0, psf_height = 0;
 	unsigned int mask_w = 0, mask_h = 0;
-	char *error;
+	const char *error = NULL;
 	double *psf;
 	bool *calcmask;
 
@@ -286,20 +287,19 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	}
 
 	/* Create and initialize the model */
-	profit_model *m = profit_create_model();
-	m->width = width;
-	m->height = height;
-	m->res_x = width;
-	m->res_y = height;
-	m->psf = psf;
-	m->psf_width = psf_width;
-	m->psf_height = psf_height;
-	m->calcmask = calcmask;
+	Model m;
+	m.width = width;
+	m.height = height;
+	m.res_x = width;
+	m.res_y = height;
+	m.psf = psf;
+	m.psf_width = psf_width;
+	m.psf_height = psf_height;
+	m.calcmask = calcmask;
 	PyObject *magzero = PyDict_GetItemString(model_dict, "magzero");
 	if( magzero != NULL ) {
-		m->magzero = PyFloat_AsDouble(magzero);
+		m.magzero = PyFloat_AsDouble(magzero);
 		if( PyErr_Occurred() ) {
-			profit_cleanup(m);
 			return NULL;
 		}
 	}
@@ -314,38 +314,37 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	 * This might take a few [ms], so we release the GIL
 	 */
 	Py_BEGIN_ALLOW_THREADS
-	profit_eval_model(m);
-	error = profit_get_error(m);
+	try {
+		m.evaluate();
+	} catch (std::exception &e) {
+		error = e.what();
+	}
 	Py_END_ALLOW_THREADS
 
 	if( error ) {
 		PyErr_SetString(profit_error, error);
-		profit_cleanup(m);
 		return NULL;
 	}
 
 	/* Copy resulting image into a 2-D tuple */
-	PyObject *image_tuple = PyTuple_New(m->height);
+	PyObject *image_tuple = PyTuple_New(m.height);
 	if( image_tuple == NULL ) {
-		profit_cleanup(m);
 		PYPROFIT_RAISE("Couldn't create return tuple");
 	}
 
-	for(i=0; i!=m->height; i++) {
-		PyObject *row_tuple = PyTuple_New(m->width);
+	for(i=0; i!=m.height; i++) {
+		PyObject *row_tuple = PyTuple_New(m.width);
 		if( row_tuple == NULL ) {
-			profit_cleanup(m);
 			PYPROFIT_RAISE("Couldn't create row tuple");
 		}
-		for(j=0; j!=m->width; j++) {
-			PyObject *val = PyFloat_FromDouble(m->image[i*m->width + j]);
+		for(j=0; j!=m.width; j++) {
+			PyObject *val = PyFloat_FromDouble(m.image[i*m.width + j]);
 			PyTuple_SetItem(row_tuple, j, val);
 		}
 		PyTuple_SetItem(image_tuple, i, row_tuple);
 	}
 
 	/* Clean up and return */
-	profit_cleanup(m);
 	return image_tuple;
 }
 
@@ -355,6 +354,8 @@ static PyMethodDef pyprofit_methods[] = {
 };
 
 /* Module initialization */
+extern "C" {
+
 PyMODINIT_FUNC
 initpyprofit(void)
 {
@@ -366,4 +367,6 @@ initpyprofit(void)
 	profit_error = PyErr_NewException("pyprofit.error", NULL, NULL);
 	Py_INCREF(profit_error);
 	PyModule_AddObject(m, "error", profit_error);
+}
+
 }

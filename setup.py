@@ -26,10 +26,10 @@ import glob
 from distutils import ccompiler
 
 # Our module
-pyprofit_sources = ['pyprofit.c']
+pyprofit_sources = ['pyprofit.cpp']
 
 # libprofit sources
-pyprofit_sources += glob.glob('libprofit/src/*.c')
+pyprofit_sources += glob.glob('libprofit/src/*.cpp')
 
 # gsl sources
 pyprofit_sources += glob.glob('gsl/specfunc/*.c')
@@ -41,13 +41,16 @@ pyprofit_sources += glob.glob('gsl/sys/*.c')
 
 incdirs = ['libprofit/include', 'gsl']
 pyprofit_ext = Extension('pyprofit',
+                       depends=glob.glob('libprofit/include/*.h'),
+                       language='c++',
                        define_macros = [('HAVE_GSL',1)],
                        sources = pyprofit_sources,
-                       include_dirs = incdirs)
+                       include_dirs = incdirs,
+                       extra_compile_args=['-std=c++11'])
 
 setup(
       name='pyprofit',
-      version='0.7',
+      version='0.8',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
@@ -55,7 +58,7 @@ setup(
       classifiers=[
           "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
           "Operating System :: OS Independent",
-          "Programming Language :: C",
+          "Programming Language :: C++",
           "Programming Language :: Python",
           "Topic :: Scientific/Engineering :: Astronomy"
       ],
