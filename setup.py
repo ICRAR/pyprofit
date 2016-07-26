@@ -19,11 +19,56 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston,
 #    MA 02111-1307  USA
 #
+import distutils
+import glob
+import os
+import sys
+import tempfile
+
 from setuptools import setup, Extension
 
-import os
-import glob
-from distutils import ccompiler
+
+# Check how C++11 has to be specified
+def get_cpp11_stdspec():
+
+    if 'PYPROFIT_CXX11' in os.environ:
+        return os.environ['PYPROFIT_CXX11']
+
+    code = """
+    #include <iostream>
+    int main() {
+        for(auto i: {0,1,2}) {
+            std::cout << i << std::endl;
+        }
+    }
+    """
+    source_fname = tempfile.mktemp(suffix='.cpp')
+    with open(source_fname, 'w') as f:
+        f.write(code)
+
+    stdspec = None
+    for stdspec_ in ['-std=c++11', '-std=c++0x', None]:
+        try:
+            compiler = distutils.ccompiler.new_compiler()
+            object_fnames = compiler.compile([source_fname], extra_postargs=[stdspec_] if stdspec_ else [])
+            stdspec = stdspec_
+            os.remove(object_fnames[0])
+            break
+        except distutils.errors.CompileError:
+            continue
+    os.remove(source_fname)
+    return stdspec
+
+stdspec = get_cpp11_stdspec()
+if stdspec is None:
+    print("No C/C++ compiler with C++11 support found. "
+          "Use the CC environment variable to specify a different compiler if you have one")
+    sys.exit(1)
+print("Using %s to enable C++11 support" % (stdspec,))
+
+def has_system_gsl():
+    compiler = distutils.ccompiler.new_compiler()
+    return compiler.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
 
 # Our module
 pyprofit_sources = ['pyprofit.cpp']
@@ -32,12 +77,26 @@ pyprofit_sources = ['pyprofit.cpp']
 pyprofit_sources += glob.glob('libprofit/src/*.cpp')
 
 # gsl sources
-pyprofit_sources += glob.glob('gsl/specfunc/*.c')
-pyprofit_sources += glob.glob('gsl/cdf/*.c')
-pyprofit_sources += glob.glob('gsl/complex/*.c')
-pyprofit_sources += glob.glob('gsl/randist/*.c')
-pyprofit_sources += glob.glob('gsl/err/*.c')
-pyprofit_sources += glob.glob('gsl/sys/*.c')
+libs = []
+if 'PYPROFIT_USE_BUNDLED_GSL' not in os.environ and has_system_gsl():
+    print("")
+    print("")
+    print("Found GSL installation on your system, will link this module against it")
+    print("")
+    print("")
+    libs == ['gsl', 'gslcblas']
+else:
+    print("")
+    print("")
+    print("Compiling module with bundled mini-GSL code")
+    print("")
+    print("")
+    pyprofit_sources += glob.glob('gsl/specfunc/*.cpp')
+    pyprofit_sources += glob.glob('gsl/cdf/*.cpp')
+    pyprofit_sources += glob.glob('gsl/complex/*.cpp')
+    pyprofit_sources += glob.glob('gsl/randist/*.cpp')
+    pyprofit_sources += glob.glob('gsl/err/*.cpp')
+    pyprofit_sources += glob.glob('gsl/sys/*.cpp')
 
 incdirs = ['libprofit/include', 'gsl']
 pyprofit_ext = Extension('pyprofit',
@@ -46,11 +105,12 @@ pyprofit_ext = Extension('pyprofit',
                        define_macros = [('HAVE_GSL',1)],
                        sources = pyprofit_sources,
                        include_dirs = incdirs,
-                       extra_compile_args=['-std=c++11'])
+                       libraries = libs,
+                       extra_compile_args=[stdspec])
 
 setup(
       name='pyprofit',
-      version='0.8.1',
+      version='0.8.2',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',

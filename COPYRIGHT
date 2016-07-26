@@ -18,3 +18,4 @@ http://www.gnu.org/software/gsl/
 
 All code under the gsl/ directory has been copied verbatim from the GSL
 project, version 1.16, which is released under the GPLv3 license.
+Files have been renamed to .cpp.
