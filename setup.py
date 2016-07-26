@@ -20,6 +20,8 @@
 #    MA 02111-1307  USA
 #
 import distutils
+import distutils.ccompiler
+import distutils.errors
 import glob
 import os
 import sys
