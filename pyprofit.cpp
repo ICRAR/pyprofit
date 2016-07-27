@@ -38,7 +38,7 @@ using namespace profit;
 
 /* Python 2/3 compatibility */
 #if PY_MAJOR_VERSION >= 3
-	#define PyInt_FromLong            PyLong_FromLong
+	#define PyInt_AsLong              PyLong_AsLong
 	#define PyInt_AsUnsignedLongMask  PyLong_AsUnsignedLongMask
 #endif
 
@@ -365,7 +365,7 @@ static PyMethodDef pyprofit_methods[] = {
 #if PY_MAJOR_VERSION >= 3
 	#define MOD_INIT(name) PyMODINIT_FUNC PyInit_##name(void)
 	#define MOD_DEF(m, name, doc, methods) \
-		struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT, name, doc, methods}; \
+		struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT, name, doc, -1, methods, }; \
 		m = PyModule_Create(&moduledef);
 	#define MOD_VAL(v) v
 #else
