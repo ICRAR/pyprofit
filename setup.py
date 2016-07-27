@@ -112,7 +112,7 @@ pyprofit_ext = Extension('pyprofit',
 
 setup(
       name='pyprofit',
-      version='0.8.6',
+      version='0.8.7',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
@@ -121,7 +121,8 @@ setup(
           "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
           "Operating System :: OS Independent",
           "Programming Language :: C++",
-          "Programming Language :: Python",
+          "Programming Language :: Python :: 2",
+          "Programming Language :: Python :: 3",
           "Topic :: Scientific/Engineering :: Astronomy"
       ],
       ext_modules = [pyprofit_ext]
