@@ -36,6 +36,12 @@
 
 using namespace profit;
 
+/* Python 2/3 compatibility */
+#if PY_MAJOR_VERSION >= 3
+	#define PyInt_FromLong            PyLong_FromLong
+	#define PyInt_AsUnsignedLongMask  PyLong_AsUnsignedLongMask
+#endif
+
 /* Macros */
 #define PYPROFIT_RAISE(str) \
 	do { \
@@ -354,19 +360,36 @@ static PyMethodDef pyprofit_methods[] = {
 };
 
 /* Module initialization */
+
+/* Support for Python 2/3 */
+#if PY_MAJOR_VERSION >= 3
+	#define MOD_INIT(name) PyMODINIT_FUNC PyInit_##name(void)
+	#define MOD_DEF(m, name, doc, methods) \
+		struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT, name, doc, methods}; \
+		m = PyModule_Create(&moduledef);
+	#define MOD_VAL(v) v
+#else
+	#define MOD_INIT(name) PyMODINIT_FUNC init##name(void)
+	#define MOD_DEF(m, name, doc, methods) \
+		m = Py_InitModule3(name, methods, doc);
+	#define MOD_VAL(v)
+#endif
+
 extern "C" {
 
-PyMODINIT_FUNC
-initpyprofit(void)
+MOD_INIT(pyprofit)
 {
-	PyObject *m = Py_InitModule("pyprofit", pyprofit_methods);
+	PyObject *m;
+
+	MOD_DEF(m, "pyprofit", "libprofit wrapper for python", pyprofit_methods);
 	if( m == NULL ) {
-		return;
+		return MOD_VAL(NULL);
 	}
 
 	profit_error = PyErr_NewException("pyprofit.error", NULL, NULL);
 	Py_INCREF(profit_error);
 	PyModule_AddObject(m, "error", profit_error);
+	return MOD_VAL(m);
 }
 
 }
