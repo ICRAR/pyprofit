@@ -112,7 +112,7 @@ pyprofit_ext = Extension('pyprofit',
 
 setup(
       name='pyprofit',
-      version='0.8.3',
+      version='0.8.4',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
