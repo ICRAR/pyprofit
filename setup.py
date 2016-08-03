@@ -121,8 +121,12 @@ setup(
           "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
           "Operating System :: OS Independent",
           "Programming Language :: C++",
-          "Programming Language :: Python :: 2",
-          "Programming Language :: Python :: 3",
+          "Programming Language :: Python :: 2.6",
+          "Programming Language :: Python :: 2.7",
+          "Programming Language :: Python :: 3.2",
+          "Programming Language :: Python :: 3.3",
+          "Programming Language :: Python :: 3.4",
+          "Programming Language :: Python :: 3.5",
           "Topic :: Scientific/Engineering :: Astronomy"
       ],
       ext_modules = [pyprofit_ext]
