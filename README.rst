@@ -7,6 +7,9 @@ pyprofit
 .. image:: https://img.shields.io/pypi/v/pyprofit.svg
     :target: https://pypi.python.org/pypi/pyprofit
 
+.. image:: https://img.shields.io/pypi/pyversions/pyprofit.svg
+    :target: https://pypi.python.org/pypi/pyprofit
+
 .. image:: https://img.shields.io/pypi/dm/pyprofit.svg
     :target: https://pypi.python.org/pypi/pyprofit
 
