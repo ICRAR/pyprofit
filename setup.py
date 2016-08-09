@@ -78,6 +78,9 @@ pyprofit_sources = ['pyprofit.cpp']
 # libprofit sources
 pyprofit_sources += glob.glob('libprofit/src/*.cpp')
 
+# include dirs
+incdirs = ['libprofit/include']
+
 # gsl sources
 libs = []
 if 'PYPROFIT_USE_BUNDLED_GSL' not in os.environ and has_system_gsl():
@@ -86,7 +89,7 @@ if 'PYPROFIT_USE_BUNDLED_GSL' not in os.environ and has_system_gsl():
     print("Found GSL installation on your system, will link this module against it")
     print("")
     print("")
-    libs == ['gsl', 'gslcblas']
+    libs += ['gsl', 'gslcblas']
 else:
     print("")
     print("")
@@ -99,8 +102,9 @@ else:
     pyprofit_sources += glob.glob('gsl/randist/*.cpp')
     pyprofit_sources += glob.glob('gsl/err/*.cpp')
     pyprofit_sources += glob.glob('gsl/sys/*.cpp')
+    incdirs.append('gsl')
 
-incdirs = ['libprofit/include', 'gsl']
+
 pyprofit_ext = Extension('pyprofit',
                        depends=glob.glob('libprofit/include/*.h'),
                        language='c++',
@@ -112,7 +116,7 @@ pyprofit_ext = Extension('pyprofit',
 
 setup(
       name='pyprofit',
-      version='0.8.7',
+      version='0.10.0',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',

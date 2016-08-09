@@ -244,6 +244,17 @@ static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned
 	return psf;
 }
 
+#define READ_DOUBLE(from, name, to) \
+	do { \
+		PyObject *_val = PyDict_GetItemString(from, name); \
+		if( _val != NULL ) { \
+			to = PyFloat_AsDouble(_val); \
+			if( PyErr_Occurred() ) { \
+				PYPROFIT_RAISE("Error reading '"#name"' argument, not a floating point number"); \
+			} \
+		} \
+	} while(0);
+
 static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	unsigned int i, j, psf_width = 0, psf_height = 0;
@@ -296,19 +307,15 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	Model m;
 	m.width = width;
 	m.height = height;
-	m.res_x = width;
-	m.res_y = height;
+	READ_DOUBLE(model_dict, "scale_x", m.scale_x);
+	READ_DOUBLE(model_dict, "scale_y", m.scale_y);
 	m.psf = psf;
 	m.psf_width = psf_width;
 	m.psf_height = psf_height;
+	READ_DOUBLE(model_dict, "psf_scale_x", m.psf_scale_x);
+	READ_DOUBLE(model_dict, "psf_scale_y", m.psf_scale_y);
 	m.calcmask = calcmask;
-	PyObject *magzero = PyDict_GetItemString(model_dict, "magzero");
-	if( magzero != NULL ) {
-		m.magzero = PyFloat_AsDouble(magzero);
-		if( PyErr_Occurred() ) {
-			return NULL;
-		}
-	}
+	READ_DOUBLE(model_dict, "magzero", m.magzero);
 
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
@@ -386,7 +393,7 @@ MOD_INIT(pyprofit)
 		return MOD_VAL(NULL);
 	}
 
-	profit_error = PyErr_NewException("pyprofit.error", NULL, NULL);
+	profit_error = PyErr_NewException((char *)"pyprofit.error", NULL, NULL);
 	Py_INCREF(profit_error);
 	PyModule_AddObject(m, "error", profit_error);
 	return MOD_VAL(m);
