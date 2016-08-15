@@ -29,6 +29,7 @@
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_sf_gamma.h"
 
+#include "moffat.h"
 #include "profit.h"
 #include "psf.h"
 #include "sersic.h"
@@ -151,6 +152,28 @@ static void _item_to_sersic_profile(Profile *profile, PyObject *item) {
 	READ_BOOL_INTO("adjust", s->adjust);
 }
 
+static void _item_to_moffat_profile(Profile *profile, PyObject *item) {
+	MoffatProfile *m = static_cast<MoffatProfile *>(profile);
+	READ_DOUBLE_INTO("xcen",  m->xcen);
+	READ_DOUBLE_INTO("ycen",  m->ycen);
+	READ_DOUBLE_INTO("mag",   m->mag);
+	READ_DOUBLE_INTO("fwhm",  m->fwhm);
+	READ_DOUBLE_INTO("con",   m->con);
+	READ_DOUBLE_INTO("ang",   m->ang);
+	READ_DOUBLE_INTO("axrat", m->axrat);
+	READ_DOUBLE_INTO("box",   m->box);
+
+	READ_BOOL_INTO("rough",   m->rough);
+	READ_DOUBLE_INTO("acc",   m->acc);
+	READ_DOUBLE_INTO("re_switch", m->re_switch);
+	READ_UNSIGNED_INT_INTO("resolution", m->resolution);
+	READ_UNSIGNED_INT_INTO("max_recursions", m->max_recursions);
+
+	READ_DOUBLE_INTO("re_switch", m->re_switch);
+
+	READ_BOOL_INTO("adjust", m->adjust);
+}
+
 static void _item_to_sky_profile(Profile *profile, PyObject *item) {
 	SkyProfile *s = static_cast<SkyProfile *>(profile);
 	READ_DOUBLE_INTO("bg", s->bg);
@@ -178,6 +201,10 @@ void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, voi
 		READ_BOOL_INTO("convolve", p->convolve);
 		Py_DECREF(item);
 	}
+}
+
+static void _read_moffat_profiles(Model &model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "moffat", &_item_to_moffat_profile);
 }
 
 static void _read_psf_profiles(Model &model, PyObject *profiles_dict) {
@@ -319,6 +346,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
+	_read_moffat_profiles(m, profiles_dict);
 	_read_sky_profiles(m, profiles_dict);
 	_read_psf_profiles(m, profiles_dict);
 
