@@ -1,4 +1,4 @@
-graft libprofit/include
+graft libprofit/profit
 graft gsl
 graft gsl/specfunc
 graft gsl/cdf
