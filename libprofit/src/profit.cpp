@@ -29,13 +29,14 @@
 #include <string>
 #include <vector>
 
-#include "convolve.h"
-#include "moffat.h"
-#include "profit.h"
-#include "psf.h"
-#include "sersic.h"
-#include "sky.h"
-#include "utils.h"
+#include "profit/convolve.h"
+#include "profit/ferrer.h"
+#include "profit/moffat.h"
+#include "profit/profit.h"
+#include "profit/psf.h"
+#include "profit/sersic.h"
+#include "profit/sky.h"
+#include "profit/utils.h"
 
 using namespace std;
 
@@ -96,6 +97,9 @@ Profile* Model::add_profile(string profile_name) {
 	}
 	else if ( profile_name == "moffat" ) {
 		profile = static_cast<Profile *>(new MoffatProfile());
+	}
+	else if ( profile_name == "ferrer" ) {
+		profile = static_cast<Profile *>(new FerrerProfile());
 	}
 	else if ( profile_name == "psf" ) {
 		profile = static_cast<Profile *>(new PsfProfile());

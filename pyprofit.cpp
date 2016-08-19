@@ -29,11 +29,12 @@
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_sf_gamma.h"
 
-#include "moffat.h"
-#include "profit.h"
-#include "psf.h"
-#include "sersic.h"
-#include "sky.h"
+#include "profit/ferrer.h"
+#include "profit/moffat.h"
+#include "profit/profit.h"
+#include "profit/psf.h"
+#include "profit/sersic.h"
+#include "profit/sky.h"
 
 using namespace profit;
 
@@ -142,11 +143,11 @@ static void _item_to_sersic_profile(Profile *profile, PyObject *item) {
 
 	READ_BOOL_INTO("rough",  s->rough);
 	READ_DOUBLE_INTO("acc",   s->acc);
-	READ_DOUBLE_INTO("re_switch", s->re_switch);
+	READ_DOUBLE_INTO("rscale_switch", s->rscale_switch);
 	READ_UNSIGNED_INT_INTO("resolution", s->resolution);
 	READ_UNSIGNED_INT_INTO("max_recursions", s->max_recursions);
 
-	READ_DOUBLE_INTO("re_switch", s->re_switch);
+	READ_DOUBLE_INTO("rscale_switch", s->rscale_switch);
 	READ_BOOL_INTO("rescale_flux", s->rescale_flux);
 
 	READ_BOOL_INTO("adjust", s->adjust);
@@ -165,13 +166,36 @@ static void _item_to_moffat_profile(Profile *profile, PyObject *item) {
 
 	READ_BOOL_INTO("rough",   m->rough);
 	READ_DOUBLE_INTO("acc",   m->acc);
-	READ_DOUBLE_INTO("re_switch", m->re_switch);
+	READ_DOUBLE_INTO("rscale_switch", m->rscale_switch);
 	READ_UNSIGNED_INT_INTO("resolution", m->resolution);
 	READ_UNSIGNED_INT_INTO("max_recursions", m->max_recursions);
 
-	READ_DOUBLE_INTO("re_switch", m->re_switch);
+	READ_DOUBLE_INTO("rscale_switch", m->rscale_switch);
 
 	READ_BOOL_INTO("adjust", m->adjust);
+}
+
+static void _item_to_ferrer_profile(Profile *profile, PyObject *item) {
+	FerrerProfile *f = static_cast<FerrerProfile *>(profile);
+	READ_DOUBLE_INTO("xcen",  f->xcen);
+	READ_DOUBLE_INTO("ycen",  f->ycen);
+	READ_DOUBLE_INTO("mag",   f->mag);
+	READ_DOUBLE_INTO("rout",  f->rout);
+	READ_DOUBLE_INTO("a",     f->a);
+	READ_DOUBLE_INTO("b",     f->b);
+	READ_DOUBLE_INTO("ang",   f->ang);
+	READ_DOUBLE_INTO("axrat", f->axrat);
+	READ_DOUBLE_INTO("box",   f->box);
+
+	READ_BOOL_INTO("rough",   f->rough);
+	READ_DOUBLE_INTO("acc",   f->acc);
+	READ_DOUBLE_INTO("rscale_switch", f->rscale_switch);
+	READ_UNSIGNED_INT_INTO("resolution", f->resolution);
+	READ_UNSIGNED_INT_INTO("max_recursions", f->max_recursions);
+
+	READ_DOUBLE_INTO("rscale_switch", f->rscale_switch);
+
+	READ_BOOL_INTO("adjust", f->adjust);
 }
 
 static void _item_to_sky_profile(Profile *profile, PyObject *item) {
@@ -201,6 +225,10 @@ void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, voi
 		READ_BOOL_INTO("convolve", p->convolve);
 		Py_DECREF(item);
 	}
+}
+
+static void _read_ferrer_profiles(Model &model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "ferrer", &_item_to_ferrer_profile);
 }
 
 static void _read_moffat_profiles(Model &model, PyObject *profiles_dict) {
@@ -347,6 +375,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
 	_read_moffat_profiles(m, profiles_dict);
+	_read_ferrer_profiles(m, profiles_dict);
 	_read_sky_profiles(m, profiles_dict);
 	_read_psf_profiles(m, profiles_dict);
 

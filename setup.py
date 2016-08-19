@@ -79,7 +79,7 @@ pyprofit_sources = ['pyprofit.cpp']
 pyprofit_sources += glob.glob('libprofit/src/*.cpp')
 
 # include dirs
-incdirs = ['libprofit/include']
+incdirs = ['libprofit']
 
 # gsl sources
 libs = []
@@ -116,7 +116,7 @@ pyprofit_ext = Extension('pyprofit',
 
 setup(
       name='pyprofit',
-      version='0.11.0',
+      version='0.13.0',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
