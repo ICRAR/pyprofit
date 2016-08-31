@@ -6,7 +6,7 @@ pyprofit is licensed under the GPLv3 license, see the COPYING file for details.
 libprofit
 =========
 
-https://github.com/rtobar/libprofit
+https://github.com/ICRAR/libprofit
 
 All code under the libprofit/ directory has been copied verbatim from the
 libprofit project, which is released under the GPLv3 license.

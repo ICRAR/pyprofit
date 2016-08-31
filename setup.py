@@ -105,7 +105,7 @@ setup(
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
-      url='https://github.com/rtobar/pyprofit',
+      url='https://github.com/ICRAR/pyprofit',
       classifiers=[
           "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
           "Operating System :: OS Independent",

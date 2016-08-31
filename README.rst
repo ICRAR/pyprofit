@@ -13,4 +13,4 @@ pyprofit
 .. image:: https://img.shields.io/pypi/dm/pyprofit.svg
     :target: https://pypi.python.org/pypi/pyprofit
 
-*pyprofit* is a python wrapper for `libprofit <https://www.github.com/rtobar/libprofit>`_.
+*pyprofit* is a python wrapper for `libprofit <https://www.github.com/ICRAR/libprofit>`_.
