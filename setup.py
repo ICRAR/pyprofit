@@ -91,7 +91,7 @@ if not has_system_gsl():
 libs = ['gsl', 'gslcblas']
 
 pyprofit_ext = Extension('pyprofit',
-                       depends=glob.glob('libprofit/include/*.h'),
+                       depends=glob.glob('libprofit/profit/*.h'),
                        language='c++',
                        define_macros = [('HAVE_GSL',1)],
                        sources = pyprofit_sources,
@@ -101,7 +101,7 @@ pyprofit_ext = Extension('pyprofit',
 
 setup(
       name='pyprofit',
-      version='0.15.2',
+      version='0.15.3',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
