@@ -26,10 +26,14 @@
 
 #include <Python.h>
 
+#include <vector>
+
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_sf_gamma.h"
 
+#include "profit/coresersic.h"
 #include "profit/ferrer.h"
+#include "profit/king.h"
 #include "profit/moffat.h"
 #include "profit/profit.h"
 #include "profit/psf.h"
@@ -51,29 +55,26 @@ using namespace profit;
 		return NULL; \
 	} while (0)
 
-#define READ_DOUBLE_INTO(key, dst) \
-	do { \
-		PyObject *tmp = PyDict_GetItemString(item, key); \
-		if( tmp != NULL ) { \
-			dst = PyFloat_AsDouble(tmp); \
-		} \
-	} while(0)
+void read_double(PyObject *item, const char *key, double &dst) {
+	PyObject *tmp = PyDict_GetItemString(item, key);
+	if( tmp != NULL ) {
+		dst = PyFloat_AsDouble(tmp);
+	}
+}
 
-#define READ_BOOL_INTO(key, dst) \
-	do { \
-		PyObject *tmp = PyDict_GetItemString(item, key); \
-		if( tmp != NULL ) { \
-			dst = (bool)PyObject_IsTrue(tmp); \
-		} \
-	} while(0)
+void read_bool(PyObject *item, const char *key, bool &dst) {
+	PyObject *tmp = PyDict_GetItemString(item, key);
+	if( tmp != NULL ) {
+		dst = (bool)PyObject_IsTrue(tmp);
+	}
+}
 
-#define READ_UNSIGNED_INT_INTO(key, dst) \
-	do { \
-		PyObject *tmp = PyDict_GetItemString(item, key); \
-		if( tmp != NULL ) { \
-			dst = (unsigned int)PyInt_AsUnsignedLongMask(tmp); \
-		} \
-	} while(0)
+void read_uint(PyObject *item, const char *key, unsigned int &dst) {
+	PyObject *tmp = PyDict_GetItemString(item, key);
+	if( tmp != NULL ) {
+		dst = (unsigned int)PyInt_AsUnsignedLongMask(tmp);
+	}
+}
 
 /* Exceptions */
 static PyObject *profit_error;
@@ -103,7 +104,7 @@ static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, 
 			width = PySequence_Size(row);
 			*matrix_height = (unsigned int)height;
 			*matrix_width = (unsigned int)width;
-			bools = (bool *)malloc(sizeof(bool) * *matrix_width * *matrix_height);
+			bools = new bool[*matrix_width * *matrix_height];
 		}
 		else {
 			if( PySequence_Size(row) != width ) {
@@ -130,87 +131,78 @@ static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, 
 	return bools;
 }
 
-static void _item_to_sersic_profile(Profile *profile, PyObject *item) {
-	SersicProfile *s = static_cast<SersicProfile *>(profile);
-	READ_DOUBLE_INTO("xcen",  s->xcen);
-	READ_DOUBLE_INTO("ycen",  s->ycen);
-	READ_DOUBLE_INTO("mag",   s->mag);
-	READ_DOUBLE_INTO("re",    s->re);
-	READ_DOUBLE_INTO("nser",  s->nser);
-	READ_DOUBLE_INTO("ang",   s->ang);
-	READ_DOUBLE_INTO("axrat", s->axrat);
-	READ_DOUBLE_INTO("box",   s->box);
+static void _item_to_radial_profile(Profile &profile, PyObject *item) {
+	RadialProfile &rp = static_cast<RadialProfile &>(profile);
+	read_double(item, "xcen",  rp.xcen);
+	read_double(item, "ycen",  rp.ycen);
+	read_double(item, "mag",   rp.mag);
+	read_double(item, "ang",   rp.ang);
+	read_double(item, "axrat", rp.axrat);
+	read_double(item, "box",   rp.box);
 
-	READ_BOOL_INTO("rough",  s->rough);
-	READ_DOUBLE_INTO("acc",   s->acc);
-	READ_DOUBLE_INTO("rscale_switch", s->rscale_switch);
-	READ_UNSIGNED_INT_INTO("resolution", s->resolution);
-	READ_UNSIGNED_INT_INTO("max_recursions", s->max_recursions);
+	read_bool(item, "rough",           rp.rough);
+	read_uint(item, "resolution",      rp.resolution);
+	read_uint(item, "max_recursions",  rp.max_recursions);
+	read_double(item, "acc",           rp.acc);
+	read_double(item, "rscale_switch", rp.rscale_switch);
 
-	READ_DOUBLE_INTO("rscale_switch", s->rscale_switch);
-	READ_BOOL_INTO("rescale_flux", s->rescale_flux);
-
-	READ_BOOL_INTO("adjust", s->adjust);
+	read_bool(item, "adjust", rp.adjust);
 }
 
-static void _item_to_moffat_profile(Profile *profile, PyObject *item) {
-	MoffatProfile *m = static_cast<MoffatProfile *>(profile);
-	READ_DOUBLE_INTO("xcen",  m->xcen);
-	READ_DOUBLE_INTO("ycen",  m->ycen);
-	READ_DOUBLE_INTO("mag",   m->mag);
-	READ_DOUBLE_INTO("fwhm",  m->fwhm);
-	READ_DOUBLE_INTO("con",   m->con);
-	READ_DOUBLE_INTO("ang",   m->ang);
-	READ_DOUBLE_INTO("axrat", m->axrat);
-	READ_DOUBLE_INTO("box",   m->box);
-
-	READ_BOOL_INTO("rough",   m->rough);
-	READ_DOUBLE_INTO("acc",   m->acc);
-	READ_DOUBLE_INTO("rscale_switch", m->rscale_switch);
-	READ_UNSIGNED_INT_INTO("resolution", m->resolution);
-	READ_UNSIGNED_INT_INTO("max_recursions", m->max_recursions);
-
-	READ_DOUBLE_INTO("rscale_switch", m->rscale_switch);
-
-	READ_BOOL_INTO("adjust", m->adjust);
+static void _item_to_sersic_profile(Profile &profile, PyObject *item) {
+	_item_to_radial_profile(profile, item);
+	SersicProfile &s = static_cast<SersicProfile &>(profile);
+	read_double(item, "re",         s.re);
+	read_double(item, "nser",       s.nser);
+	read_bool(item, "rescale_flux", s.rescale_flux);
 }
 
-static void _item_to_ferrer_profile(Profile *profile, PyObject *item) {
-	FerrerProfile *f = static_cast<FerrerProfile *>(profile);
-	READ_DOUBLE_INTO("xcen",  f->xcen);
-	READ_DOUBLE_INTO("ycen",  f->ycen);
-	READ_DOUBLE_INTO("mag",   f->mag);
-	READ_DOUBLE_INTO("rout",  f->rout);
-	READ_DOUBLE_INTO("a",     f->a);
-	READ_DOUBLE_INTO("b",     f->b);
-	READ_DOUBLE_INTO("ang",   f->ang);
-	READ_DOUBLE_INTO("axrat", f->axrat);
-	READ_DOUBLE_INTO("box",   f->box);
-
-	READ_BOOL_INTO("rough",   f->rough);
-	READ_DOUBLE_INTO("acc",   f->acc);
-	READ_DOUBLE_INTO("rscale_switch", f->rscale_switch);
-	READ_UNSIGNED_INT_INTO("resolution", f->resolution);
-	READ_UNSIGNED_INT_INTO("max_recursions", f->max_recursions);
-
-	READ_DOUBLE_INTO("rscale_switch", f->rscale_switch);
-
-	READ_BOOL_INTO("adjust", f->adjust);
+static void _item_to_moffat_profile(Profile &profile, PyObject *item) {
+	_item_to_radial_profile(profile, item);
+	MoffatProfile &m = static_cast<MoffatProfile &>(profile);
+	read_double(item, "fwhm",  m.fwhm);
+	read_double(item, "con",   m.con);
 }
 
-static void _item_to_sky_profile(Profile *profile, PyObject *item) {
-	SkyProfile *s = static_cast<SkyProfile *>(profile);
-	READ_DOUBLE_INTO("bg", s->bg);
+static void _item_to_ferrer_profile(Profile &profile, PyObject *item) {
+	_item_to_radial_profile(profile, item);
+	FerrerProfile &f = static_cast<FerrerProfile &>(profile);
+	read_double(item, "rout", f.rout);
+	read_double(item, "a",    f.a);
+	read_double(item, "b",    f.b);
 }
 
-static void _item_to_psf_profile(Profile *profile, PyObject *item) {
-	PsfProfile *psf = static_cast<PsfProfile *>(profile);
-	READ_DOUBLE_INTO("xcen",  psf->xcen);
-	READ_DOUBLE_INTO("ycen",  psf->ycen);
-	READ_DOUBLE_INTO("mag",   psf->mag);
+static void _item_to_coresersic_profile(Profile &profile, PyObject *item) {
+	_item_to_radial_profile(profile, item);
+	CoreSersicProfile &csp = static_cast<CoreSersicProfile &>(profile);
+	read_double(item, "re",   csp.re);
+	read_double(item, "rb",   csp.rb);
+	read_double(item, "nser", csp.nser);
+	read_double(item, "a",    csp.a);
+	read_double(item, "b",    csp.b);
 }
 
-void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, void (item_to_profile)(Profile *, PyObject *item)) {
+static void _item_to_king_profile(Profile &profile, PyObject *item) {
+	_item_to_radial_profile(profile, item);
+	KingProfile &k = static_cast<KingProfile &>(profile);
+	read_double(item, "rc", k.rc);
+	read_double(item, "rt", k.rt);
+	read_double(item, "a",  k.a);
+}
+
+static void _item_to_sky_profile(Profile &profile, PyObject *item) {
+	SkyProfile &s = static_cast<SkyProfile &>(profile);
+	read_double(item, "bg", s.bg);
+}
+
+static void _item_to_psf_profile(Profile &profile, PyObject *item) {
+	PsfProfile &psf = static_cast<PsfProfile &>(profile);
+	read_double(item, "xcen",  psf.xcen);
+	read_double(item, "ycen",  psf.ycen);
+	read_double(item, "mag",   psf.mag);
+}
+
+void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, void (item_to_profile)(Profile &, PyObject *item)) {
 
 	PyObject *profile_sequence = PyDict_GetItemString(profiles_dict, name);
 	if( profile_sequence == NULL ) {
@@ -220,15 +212,28 @@ void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, voi
 	Py_ssize_t length = PySequence_Size(profile_sequence);
 	for(Py_ssize_t i = 0; i!= length; i++) {
 		PyObject *item = PySequence_GetItem(profile_sequence, i);
-		Profile *p = model.add_profile(name);
-		item_to_profile(p, item);
-		READ_BOOL_INTO("convolve", p->convolve);
+		try {
+			Profile &p = model.add_profile(name);
+			read_bool(item, "convolve", p.convolve);
+			item_to_profile(p, item);
+		} catch(invalid_parameter &e) {
+			// ignoring for now...
+			continue;
+		}
 		Py_DECREF(item);
 	}
 }
 
+static void _read_coresersic_profiles(Model &model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "coresersic", &_item_to_coresersic_profile);
+}
+
 static void _read_ferrer_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "ferrer", &_item_to_ferrer_profile);
+}
+
+static void _read_king_profiles(Model &model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "king", &_item_to_king_profile);
 }
 
 static void _read_moffat_profiles(Model &model, PyObject *profiles_dict) {
@@ -272,7 +277,7 @@ static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned
 			width = PySequence_Size(row);
 			*psf_height = (unsigned int)height;
 			*psf_width = (unsigned int)width;
-			psf = (double *)malloc(sizeof(double) * *psf_width * *psf_height);
+			psf = new double[width * height];
 		}
 		else {
 			if( PySequence_Size(row) != width ) {
@@ -364,18 +369,26 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	m.height = height;
 	READ_DOUBLE(model_dict, "scale_x", m.scale_x);
 	READ_DOUBLE(model_dict, "scale_y", m.scale_y);
-	m.psf = psf;
-	m.psf_width = psf_width;
-	m.psf_height = psf_height;
-	READ_DOUBLE(model_dict, "psf_scale_x", m.psf_scale_x);
-	READ_DOUBLE(model_dict, "psf_scale_y", m.psf_scale_y);
-	m.calcmask = calcmask;
+	if( psf ) {
+		m.psf = std::vector<double>(psf, psf + (psf_width * psf_height));
+		m.psf_width = psf_width;
+		m.psf_height = psf_height;
+		READ_DOUBLE(model_dict, "psf_scale_x", m.psf_scale_x);
+		READ_DOUBLE(model_dict, "psf_scale_y", m.psf_scale_y);
+		delete [] psf;
+	}
+	if( calcmask ) {
+		m.calcmask = std::vector<bool>(calcmask, calcmask + (width * height));
+		delete [] calcmask;
+	}
 	READ_DOUBLE(model_dict, "magzero", m.magzero);
 
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
 	_read_moffat_profiles(m, profiles_dict);
 	_read_ferrer_profiles(m, profiles_dict);
+	_read_king_profiles(m, profiles_dict);
+	_read_coresersic_profiles(m, profiles_dict);
 	_read_sky_profiles(m, profiles_dict);
 	_read_psf_profiles(m, profiles_dict);
 
@@ -383,9 +396,10 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	 * Go, Go, Go!
 	 * This might take a few [ms], so we release the GIL
 	 */
+	std::vector<double> image;
 	Py_BEGIN_ALLOW_THREADS
 	try {
-		m.evaluate();
+		image = m.evaluate();
 	} catch (std::exception &e) {
 		error = e.what();
 	}
@@ -408,7 +422,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 			PYPROFIT_RAISE("Couldn't create row tuple");
 		}
 		for(j=0; j!=m.width; j++) {
-			PyObject *val = PyFloat_FromDouble(m.image[i*m.width + j]);
+			PyObject *val = PyFloat_FromDouble(image[i*m.width + j]);
 			PyTuple_SetItem(row_tuple, j, val);
 		}
 		PyTuple_SetItem(image_tuple, i, row_tuple);

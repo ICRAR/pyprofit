@@ -1,12 +1,12 @@
 /**
- * Header file for sersic profile implementation
+ * Header file for King profile implementation
  *
  * ICRAR - International Centre for Radio Astronomy Research
  * (c) UWA - The University of Western Australia, 2016
  * Copyright by UWA (in the framework of the ICRAR)
  * All rights reserved
  *
- * Contributed by Rodrigo Tobar
+ * Contributed by Aaron Robotham and Rodrigo Tobar
  *
  * This file is part of libprofit.
  *
@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _SERSIC_H_
-#define _SERSIC_H_
+#ifndef _KING_H_
+#define _KING_H_
 
 #include "profit/radial.h"
 
@@ -32,28 +32,25 @@ namespace profit
 {
 
 /**
- * A Sersic profile
+ * A King profile
  *
- * The ferrer profile has parameters ``nser`` and ``re`` and is calculated as
- * follows for coordinates x/y::
+ * The King profile has parameters ``rc``, ``rt`` and ``a`` is
+ * calculated as follows for coordinates x/y::
  *
- *   e^{-bn * (r_factor - 1)}
+ *    temp=1/(1+(rt/rc)^2)^(1/a)
+ *    inten = (1-temp)^(-a)*
+ *            (1/(1+(r/rc)^2)^(1/a)-temp)^a
  *
  * with::
- *  r_factor = (r/re)^{1/nser}
- *         r = (x^{2+b} + y^{2+b})^{1/(2+b)}
- *         b = box parameter
- *        bn = qgamma(0.5, 2*nser)
+ *
+ *           r = (x^{2+B} + y^{2+B})^{1/(2+B)}
+ *           B = box parameter
  */
-class SersicProfile : public RadialProfile {
+class KingProfile : public RadialProfile {
 
 protected:
 
 	/* All these are inherited from RadialProfile */
-	void initial_calculations() override;
-	void subsampling_params(double x, double y, unsigned int &res, unsigned int &max_rec) override;
-	double get_pixel_scale() override;
-
 	double get_lumtot(double r_box) override;
 	double get_rscale() override;
 	double adjust_acc() override;
@@ -68,7 +65,7 @@ public:
 	 *
 	 * @param model The model this profile belongs to
 	 */
-	SersicProfile(const Model & model);
+	KingProfile(const Model &model);
 
 	/*
 	 * -------------------------
@@ -77,26 +74,22 @@ public:
 	 */
 
 	/**
-	 * The effective radius
+	 * The effective radius of the Sersic component
 	 */
-	double re;
+	double rc;
 
 	/**
-	 * The sersic index
+	 * The transition radius of the Sersic profile
 	 */
-	double nser;
+	double rt;
 
 	/**
-	 * Rescale flux up to rscale_max or not
+	 * The power-law of the King.
 	 */
-	bool rescale_flux;
-
-	/* These are internally calculated profile init */
-	double _bn;
-	double _rescale_factor;
+	double a;
 
 };
 
 } /* namespace profit */
 
-#endif /* _SERSIC_H_ */
+#endif /* _KING_H_ */

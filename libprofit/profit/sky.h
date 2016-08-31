@@ -32,13 +32,42 @@
 namespace profit
 {
 
+/**
+ * A sky profile.
+ *
+ * This profiles simply fills the image with a constant ``bg`` value, which is
+ * given as a parameter.
+ */
 class SkyProfile : public Profile {
 
 public:
-	SkyProfile();
-	void validate();
-	void evaluate(double *image);
+
+	/**
+	 * Constructor
+	 *
+	 * @param model The model this profile belongs to
+	 */
+	SkyProfile(const Model &model);
+
+	/*
+	 * ---------------------------------------------
+	 * Pure virtual functions implementations follow
+	 * ---------------------------------------------
+	 */
+	void validate() override;
+	void evaluate(std::vector<double> &image) override;
+
+	/*
+	 * -------------------------
+	 * Profile parameters follow
+	 * -------------------------
+	 */
+
+	/**
+	 * The value to fill the image with.
+	 */
 	double bg;
+
 };
 
 } /* namespace profit */

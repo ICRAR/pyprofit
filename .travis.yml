@@ -8,6 +8,12 @@ python:
  - "3.4"
  - "3.5"
 
+# pyprofit needs gsl
+addons:
+ apt:
+  packages:
+   - libgsl0-dev
+
 # Run the build
 script: "python setup.py install"
 

@@ -1,12 +1,12 @@
 /**
- * Header file for sersic profile implementation
+ * Header file for CoreSersic profile implementation
  *
  * ICRAR - International Centre for Radio Astronomy Research
  * (c) UWA - The University of Western Australia, 2016
  * Copyright by UWA (in the framework of the ICRAR)
  * All rights reserved
  *
- * Contributed by Rodrigo Tobar
+ * Contributed by Aaron Robotham and Rodrigo Tobar
  *
  * This file is part of libprofit.
  *
@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _SERSIC_H_
-#define _SERSIC_H_
+#ifndef _CORESERSIC_H_
+#define _CORESERSIC_H_
 
 #include "profit/radial.h"
 
@@ -32,33 +32,30 @@ namespace profit
 {
 
 /**
- * A Sersic profile
+ * A CoreSersic profile
  *
- * The ferrer profile has parameters ``nser`` and ``re`` and is calculated as
- * follows for coordinates x/y::
+ * The CoreSersic profile has parameters ``re``, ``rb``, ``nser``, ``a`` and ``b`` and is
+ * calculated as follows for coordinates x/y::
  *
- *   e^{-bn * (r_factor - 1)}
+ *    (1+(r/rb)^(-a))^(b/a)*
+ *        exp(-bn*(((r^a+rb^a)/re^a))^(1/(nser*a)))
  *
  * with::
- *  r_factor = (r/re)^{1/nser}
- *         r = (x^{2+b} + y^{2+b})^{1/(2+b)}
- *         b = box parameter
- *        bn = qgamma(0.5, 2*nser)
+ *
+ *           r = (x^{2+B} + y^{2+B})^{1/(2+B)}
+ *           B = box parameter
  */
-class SersicProfile : public RadialProfile {
+class CoreSersicProfile : public RadialProfile {
 
 protected:
 
 	/* All these are inherited from RadialProfile */
-	void initial_calculations() override;
-	void subsampling_params(double x, double y, unsigned int &res, unsigned int &max_rec) override;
-	double get_pixel_scale() override;
-
 	double get_lumtot(double r_box) override;
 	double get_rscale() override;
 	double adjust_acc() override;
 	double adjust_rscale_switch() override;
 	double adjust_rscale_max() override;
+	void initial_calculations() override;
 	eval_function_t get_evaluation_function() override;
 
 public:
@@ -68,7 +65,7 @@ public:
 	 *
 	 * @param model The model this profile belongs to
 	 */
-	SersicProfile(const Model & model);
+	CoreSersicProfile(const Model &model);
 
 	/*
 	 * -------------------------
@@ -77,26 +74,37 @@ public:
 	 */
 
 	/**
-	 * The effective radius
+	 * The effective radius of the Sersic component
 	 */
 	double re;
 
 	/**
-	 * The sersic index
+	 * The transition radius of the Sersic profile
+	 */
+	double rb;
+
+	/**
+	 * The Sersic index of the Sersic profile
 	 */
 	double nser;
 
 	/**
-	 * Rescale flux up to rscale_max or not
+	 * The strength of transition from inner core to outer Sersic
 	 */
-	bool rescale_flux;
+	double a;
 
-	/* These are internally calculated profile init */
+	/**
+	 * The inner power-law of the Core-Sersic.
+	 */
+	double b;
+
+	/**
+	 * The Sersic bn.
+	 */
 	double _bn;
-	double _rescale_factor;
 
 };
 
 } /* namespace profit */
 
-#endif /* _SERSIC_H_ */
+#endif /* _CORESERSIC_H_ */

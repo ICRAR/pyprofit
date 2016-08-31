@@ -10,12 +10,3 @@ https://github.com/rtobar/libprofit
 
 All code under the libprofit/ directory has been copied verbatim from the
 libprofit project, which is released under the GPLv3 license.
-
-gsl
-===
-
-http://www.gnu.org/software/gsl/
-
-All code under the gsl/ directory has been copied verbatim from the GSL
-project, version 1.16, which is released under the GPLv3 license.
-Files have been renamed to .cpp.
