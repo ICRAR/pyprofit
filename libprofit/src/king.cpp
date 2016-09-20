@@ -96,7 +96,7 @@ double KingProfile::adjust_rscale_switch() {
 }
 
 double KingProfile::adjust_rscale_max() {
-	return 1;
+	return 1.5;
 }
 
 double KingProfile::get_rscale() {

@@ -26,6 +26,8 @@
 
 #include <algorithm>
 #include <functional>
+#include <limits>
+#include <numeric>
 #include <vector>
 
 #include "profit/utils.h"
@@ -105,6 +107,9 @@ double pgamma(double q, double shape) {
 }
 
 double gammafn(double x) {
+	if( x > GSL_SF_GAMMA_XMAX ) {
+		return numeric_limits<double>::infinity();
+	}
 	return gsl_sf_gamma(x);
 }
 
