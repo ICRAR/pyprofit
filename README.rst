@@ -1,8 +1,8 @@
 pyprofit
 ########
 
-.. image:: https://travis-ci.org/rtobar/pyprofit.svg?branch=master
-    :target: https://travis-ci.org/rtobar/pyprofit
+.. image:: https://travis-ci.org/ICRAR/pyprofit.svg?branch=master
+    :target: https://travis-ci.org/ICRAR/pyprofit
 
 .. image:: https://img.shields.io/pypi/v/pyprofit.svg
     :target: https://pypi.python.org/pypi/pyprofit
