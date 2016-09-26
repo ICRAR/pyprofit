@@ -1,5 +1,5 @@
 /**
- * Header file for ferrer profile implementation
+ * Header file for BrokenExponential profile implementation
  *
  * ICRAR - International Centre for Radio Astronomy Research
  * (c) UWA - The University of Western Australia, 2016
@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _FERRER_H_
-#define _FERRER_H_
+#ifndef _BROKENEXPONENTIAL_H_
+#define _BROKENEXPONENTIAL_H_
 
 #include "profit/radial.h"
 
@@ -32,20 +32,20 @@ namespace profit
 {
 
 /**
- * A Ferrer profile
+ * A Broken Exponential profile
  *
- * The ferrer profile has parameters ``rout``, ``a`` and ``b`` and is
+ * The Broken Exponential profile has parameters ``h1``, ``h2``, ``rb`` and ``a`` is
  * calculated as follows for coordinates x/y::
  *
- *    (1-r_factor)^(a)
+ *    inten = exp(-r/h1)*
+ *            (1+exp(a*(r-rb)))^((1/a)*(1/h1-1/h2))
  *
  * with::
  *
- *    r_factor = (r/rout)^(2-b)
  *           r = (x^{2+B} + y^{2+B})^{1/(2+B)}
  *           B = box parameter
  */
-class FerrerProfile : public RadialProfile {
+class BrokenExponentialProfile : public RadialProfile {
 
 protected:
 
@@ -64,7 +64,7 @@ public:
 	 *
 	 * @param model The model this profile belongs to
 	 */
-	FerrerProfile(const Model & model);
+	BrokenExponentialProfile(const Model &model);
 
 	void validate() override;
 
@@ -75,22 +75,27 @@ public:
 	 */
 
 	/**
-	 * The outer truncation radius
+	 * The inner exponential scale length.
 	 */
-	double rout;
+	double h1;
 
 	/**
-	 * The global power-law slope to the profile center
+	 * The outer exponential scale length (must be equal to or less than ``h1``).
+	 */
+	double h2;
+
+	/**
+	 * The break radius.
+	 */
+	double rb;
+
+	/**
+	 * The strength of the truncation as the radius approaches ``rb``.
 	 */
 	double a;
-
-	/**
-	 * The strength of the truncation as the radius approaches ``rout``.
-	 */
-	double b;
 
 };
 
 } /* namespace profit */
 
-#endif /* _FERRER_H_ */
+#endif /* _BROKENEXPONENTIAL_H_ */

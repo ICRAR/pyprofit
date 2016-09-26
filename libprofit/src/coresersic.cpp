@@ -79,6 +79,28 @@ eval_function_t CoreSersicProfile::get_evaluation_function() {
 	return &_coresersic_for_xy_r;
 }
 
+void CoreSersicProfile::validate() {
+
+	RadialProfile::validate();
+
+	if ( re <= 0 ) {
+		throw invalid_parameter("re <= 0, must have re > 0");
+	}
+	if ( rb <= 0 ) {
+		throw invalid_parameter("rb <= 0, must have rb > 0");
+	}
+	if ( nser <= 0 ) {
+		throw invalid_parameter("nser <= 0, must have nser > 0");
+	}
+	if ( a <= 0 ) {
+		throw invalid_parameter("a <= 0, must have a > 0");
+	}
+	if ( b > 1.999 ) {
+		throw invalid_parameter("b > 1.999, must have b < 1.999");
+	}
+
+}
+
 static
 double coresersic_int(double r, void *ex) {
 	CoreSersicProfile *csp = (CoreSersicProfile *)ex;

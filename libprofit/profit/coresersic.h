@@ -67,6 +67,8 @@ public:
 	 */
 	CoreSersicProfile(const Model &model);
 
+	void validate() override;
+
 	/*
 	 * -------------------------
 	 * Profile parameters follow

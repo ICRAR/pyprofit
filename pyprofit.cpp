@@ -26,11 +26,13 @@
 
 #include <Python.h>
 
+#include <sstream>
 #include <vector>
 
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_sf_gamma.h"
 
+#include "profit/brokenexponential.h"
 #include "profit/coresersic.h"
 #include "profit/ferrer.h"
 #include "profit/king.h"
@@ -182,6 +184,15 @@ static void _item_to_coresersic_profile(Profile &profile, PyObject *item) {
 	read_double(item, "b",    csp.b);
 }
 
+static void _item_to_brokenexp_profile(Profile &profile, PyObject *item) {
+	_item_to_radial_profile(profile, item);
+	BrokenExponentialProfile &bep = static_cast<BrokenExponentialProfile &>(profile);
+	read_double(item, "h1", bep.h1);
+	read_double(item, "h2", bep.h2);
+	read_double(item, "rb", bep.rb);
+	read_double(item, "a",  bep.a);
+}
+
 static void _item_to_king_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	KingProfile &k = static_cast<KingProfile &>(profile);
@@ -217,11 +228,17 @@ void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, voi
 			read_bool(item, "convolve", p.convolve);
 			item_to_profile(p, item);
 		} catch(invalid_parameter &e) {
-			// ignoring for now...
+			std::ostringstream os;
+			os << "warning: failed to create profile " << name << ": " << e.what();
+			PySys_WriteStderr("%s\n", os.str().c_str());
 			continue;
 		}
 		Py_DECREF(item);
 	}
+}
+
+static void _read_brokenexp_profiles(Model &model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "brokenexp", &_item_to_brokenexp_profile);
 }
 
 static void _read_coresersic_profiles(Model &model, PyObject *profiles_dict) {
@@ -230,6 +247,7 @@ static void _read_coresersic_profiles(Model &model, PyObject *profiles_dict) {
 
 static void _read_ferrer_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "ferrer", &_item_to_ferrer_profile);
+	_read_profiles(model, profiles_dict, "ferrers", &_item_to_ferrer_profile);
 }
 
 static void _read_king_profiles(Model &model, PyObject *profiles_dict) {
@@ -389,6 +407,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	_read_ferrer_profiles(m, profiles_dict);
 	_read_king_profiles(m, profiles_dict);
 	_read_coresersic_profiles(m, profiles_dict);
+	_read_brokenexp_profiles(m, profiles_dict);
 	_read_sky_profiles(m, profiles_dict);
 	_read_psf_profiles(m, profiles_dict);
 
