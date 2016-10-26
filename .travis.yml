@@ -14,8 +14,10 @@ addons:
   packages:
    - libgsl0-dev
 
-# Run the build
-script: "python setup.py install"
+# Run the build and make sure we can at least import pyprofit correctly
+script:
+ - python setup.py install
+ - python -c "import pyprofit"
 
 # safelist
 branches:
