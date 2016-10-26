@@ -49,7 +49,7 @@ def get_cpp11_stdspec():
         f.write(code)
 
     stdspec = None
-    for stdspec_ in ['-std=c++11', '-std=c++0x', None]:
+    for stdspec_ in ['-std=c++11', '-std=c++0x', '-std=c++', '']:
         try:
             compiler = distutils.ccompiler.new_compiler()
             object_fnames = compiler.compile([source_fname], extra_postargs=[stdspec_] if stdspec_ else [])
@@ -63,10 +63,12 @@ def get_cpp11_stdspec():
 
 stdspec = get_cpp11_stdspec()
 if stdspec is None:
-    print("No C/C++ compiler with C++11 support found. "
-          "Use the CC environment variable to specify a different compiler if you have one")
+    print("No C/C++ compiler with C++11 support found."
+          "Use the CC environment variable to specify a different compiler if you have one.\n"
+          "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches "
+          "(e.g., PYPROFIT_CXX11='-std c++11')")
     sys.exit(1)
-print("Using %s to enable C++11 support" % (stdspec,))
+print("Using '%s' to enable C++11 support" % (stdspec,))
 
 def has_system_gsl():
     compiler = distutils.ccompiler.new_compiler()
@@ -97,7 +99,7 @@ pyprofit_ext = Extension('pyprofit',
                        sources = pyprofit_sources,
                        include_dirs = incdirs,
                        libraries = libs,
-                       extra_compile_args=[stdspec])
+                       extra_compile_args=[stdspec] if stdspec else [])
 
 setup(
       name='pyprofit',
