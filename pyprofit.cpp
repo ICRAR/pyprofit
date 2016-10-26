@@ -459,8 +459,8 @@ static PyMethodDef pyprofit_methods[] = {
 /* Module initialization */
 
 /* Support for Python 2/3 */
-static struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT, "pyprofot", "libprofit wrapper for python", -1, pyprofit_methods};
 #if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT, "pyprofot", "libprofit wrapper for python", -1, pyprofit_methods};
 	#define MOD_INIT(name) PyMODINIT_FUNC PyInit_##name(void)
 	#define MOD_DEF(m, name, doc, methods) \
 		m = PyModule_Create(&moduledef);
