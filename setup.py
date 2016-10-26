@@ -70,7 +70,7 @@ if stdspec is None:
     sys.exit(1)
 print("Using '%s' to enable C++11 support" % (stdspec,))
 
-def has_system_gsl():
+def has_gsl():
     compiler = distutils.ccompiler.new_compiler()
     return compiler.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
 
@@ -84,12 +84,10 @@ pyprofit_sources += glob.glob('libprofit/src/*.cpp')
 incdirs = ['libprofit']
 
 # gsl libs
-if not has_system_gsl():
-    print("")
-    print("")
-    print("No GSL installation found on your system. Install the GSL development package and try again")
-    print("")
-    print("")
+if not has_gsl():
+    print("\n\nNo GSL installation found on your system. Install the GSL development package and try again\n\n")
+    sys.exit(1)
+
 libs = ['gsl', 'gslcblas']
 
 pyprofit_ext = Extension('pyprofit',
