@@ -32,15 +32,7 @@
 #include "gsl/gsl_cdf.h"
 #include "gsl/gsl_sf_gamma.h"
 
-#include "profit/brokenexponential.h"
-#include "profit/coresersic.h"
-#include "profit/ferrer.h"
-#include "profit/king.h"
-#include "profit/moffat.h"
 #include "profit/profit.h"
-#include "profit/psf.h"
-#include "profit/sersic.h"
-#include "profit/sky.h"
 
 using namespace profit;
 
@@ -57,24 +49,24 @@ using namespace profit;
 		return NULL; \
 	} while (0)
 
-void read_double(PyObject *item, const char *key, double &dst) {
+void read_double(Profile &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
-		dst = PyFloat_AsDouble(tmp);
+		p.parameter(key, PyFloat_AsDouble(tmp));
 	}
 }
 
-void read_bool(PyObject *item, const char *key, bool &dst) {
+void read_bool(Profile &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
-		dst = (bool)PyObject_IsTrue(tmp);
+		p.parameter(key, (bool)PyObject_IsTrue(tmp));
 	}
 }
 
-void read_uint(PyObject *item, const char *key, unsigned int &dst) {
+void read_uint(Profile &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
-		dst = (unsigned int)PyInt_AsUnsignedLongMask(tmp);
+		p.parameter(key, (unsigned int)PyInt_AsUnsignedLongMask(tmp));
 	}
 }
 
@@ -134,83 +126,74 @@ static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, 
 }
 
 static void _item_to_radial_profile(Profile &profile, PyObject *item) {
-	RadialProfile &rp = static_cast<RadialProfile &>(profile);
-	read_double(item, "xcen",  rp.xcen);
-	read_double(item, "ycen",  rp.ycen);
-	read_double(item, "mag",   rp.mag);
-	read_double(item, "ang",   rp.ang);
-	read_double(item, "axrat", rp.axrat);
-	read_double(item, "box",   rp.box);
+	read_double(profile, item, "xcen");
+	read_double(profile, item, "ycen");
+	read_double(profile, item, "mag");
+	read_double(profile, item, "ang");
+	read_double(profile, item, "axrat");
+	read_double(profile, item, "box");
 
-	read_bool(item, "rough",           rp.rough);
-	read_uint(item, "resolution",      rp.resolution);
-	read_uint(item, "max_recursions",  rp.max_recursions);
-	read_double(item, "acc",           rp.acc);
-	read_double(item, "rscale_switch", rp.rscale_switch);
+	read_bool(profile, item, "rough");
+	read_uint(profile, item, "resolution");
+	read_uint(profile, item, "max_recursions");
+	read_double(profile, item, "acc");
+	read_double(profile, item, "rscale_switch");
 
-	read_bool(item, "adjust", rp.adjust);
+	read_bool(profile, item, "adjust");
 }
 
 static void _item_to_sersic_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
-	SersicProfile &s = static_cast<SersicProfile &>(profile);
-	read_double(item, "re",         s.re);
-	read_double(item, "nser",       s.nser);
-	read_bool(item, "rescale_flux", s.rescale_flux);
+	read_double(profile, item, "re");
+	read_double(profile, item, "nser");
+	read_bool(profile, item, "rescale_flux");
 }
 
 static void _item_to_moffat_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
-	MoffatProfile &m = static_cast<MoffatProfile &>(profile);
-	read_double(item, "fwhm",  m.fwhm);
-	read_double(item, "con",   m.con);
+	read_double(profile, item, "fwhm");
+	read_double(profile, item, "con");
 }
 
 static void _item_to_ferrer_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
-	FerrerProfile &f = static_cast<FerrerProfile &>(profile);
-	read_double(item, "rout", f.rout);
-	read_double(item, "a",    f.a);
-	read_double(item, "b",    f.b);
+	read_double(profile, item, "rout");
+	read_double(profile, item, "a");
+	read_double(profile, item, "b");
 }
 
 static void _item_to_coresersic_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
-	CoreSersicProfile &csp = static_cast<CoreSersicProfile &>(profile);
-	read_double(item, "re",   csp.re);
-	read_double(item, "rb",   csp.rb);
-	read_double(item, "nser", csp.nser);
-	read_double(item, "a",    csp.a);
-	read_double(item, "b",    csp.b);
+	read_double(profile, item, "re");
+	read_double(profile, item, "rb");
+	read_double(profile, item, "nser");
+	read_double(profile, item, "a");
+	read_double(profile, item, "b");
 }
 
 static void _item_to_brokenexp_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
-	BrokenExponentialProfile &bep = static_cast<BrokenExponentialProfile &>(profile);
-	read_double(item, "h1", bep.h1);
-	read_double(item, "h2", bep.h2);
-	read_double(item, "rb", bep.rb);
-	read_double(item, "a",  bep.a);
+	read_double(profile, item, "h1");
+	read_double(profile, item, "h2");
+	read_double(profile, item, "rb");
+	read_double(profile, item, "a");
 }
 
 static void _item_to_king_profile(Profile &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
-	KingProfile &k = static_cast<KingProfile &>(profile);
-	read_double(item, "rc", k.rc);
-	read_double(item, "rt", k.rt);
-	read_double(item, "a",  k.a);
+	read_double(profile, item, "rc");
+	read_double(profile, item, "rt");
+	read_double(profile, item, "a");
 }
 
 static void _item_to_sky_profile(Profile &profile, PyObject *item) {
-	SkyProfile &s = static_cast<SkyProfile &>(profile);
-	read_double(item, "bg", s.bg);
+	read_double(profile, item, "bg");
 }
 
 static void _item_to_psf_profile(Profile &profile, PyObject *item) {
-	PsfProfile &psf = static_cast<PsfProfile &>(profile);
-	read_double(item, "xcen",  psf.xcen);
-	read_double(item, "ycen",  psf.ycen);
-	read_double(item, "mag",   psf.mag);
+	read_double(profile, item, "xcen");
+	read_double(profile, item, "ycen");
+	read_double(profile, item, "mag");
 }
 
 void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, void (item_to_profile)(Profile &, PyObject *item)) {
@@ -225,7 +208,7 @@ void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, voi
 		PyObject *item = PySequence_GetItem(profile_sequence, i);
 		try {
 			Profile &p = model.add_profile(name);
-			read_bool(item, "convolve", p.convolve);
+			read_bool(p, item, "convolve");
 			item_to_profile(p, item);
 		} catch(invalid_parameter &e) {
 			std::ostringstream os;
