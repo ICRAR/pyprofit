@@ -27,6 +27,7 @@
 #include <Python.h>
 
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "gsl/gsl_cdf.h"
@@ -320,7 +321,6 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	unsigned int i, j, psf_width = 0, psf_height = 0;
 	unsigned int mask_w = 0, mask_h = 0;
-	const char *error = NULL;
 	double *psf;
 	bool *calcmask;
 
@@ -399,16 +399,18 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	 * This might take a few [ms], so we release the GIL
 	 */
 	std::vector<double> image;
+	std::string error;
 	Py_BEGIN_ALLOW_THREADS
 	try {
 		image = m.evaluate();
 	} catch (std::exception &e) {
+		// can't PyErr_SetString directly here because we don't have the GIL
 		error = e.what();
 	}
 	Py_END_ALLOW_THREADS
 
-	if( error ) {
-		PyErr_SetString(profit_error, error);
+	if( !error.empty() ) {
+		PyErr_SetString(profit_error, error.c_str());
 		return NULL;
 	}
 
@@ -467,8 +469,15 @@ MOD_INIT(pyprofit)
 	}
 
 	profit_error = PyErr_NewException((char *)"pyprofit.error", NULL, NULL);
+	if( !profit_error ) {
+		return MOD_VAL(NULL);
+	}
+
 	Py_INCREF(profit_error);
-	PyModule_AddObject(m, "error", profit_error);
+	if( PyModule_AddObject(m, "error", profit_error) == -1 ) {
+		return MOD_VAL(NULL);
+	}
+
 	return MOD_VAL(m);
 }
 
