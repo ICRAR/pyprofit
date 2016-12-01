@@ -29,6 +29,10 @@ import tempfile
 
 from setuptools import setup, Extension
 
+def new_compiler():
+    compiler = distutils.ccompiler.new_compiler()
+    distutils.sysconfig.customize_compiler(compiler) # CC, CFLAGS, LDFLAGS, etc
+    return compiler
 
 # Check how C++11 has to be specified
 def get_cpp11_stdspec():
@@ -51,7 +55,7 @@ def get_cpp11_stdspec():
     stdspec = None
     for stdspec_ in ['-std=c++11', '-std=c++0x', '-std=c++', '']:
         try:
-            compiler = distutils.ccompiler.new_compiler()
+            compiler = new_compiler()
             object_fnames = compiler.compile([source_fname], extra_postargs=[stdspec_] if stdspec_ else [])
             stdspec = stdspec_
             os.remove(object_fnames[0])
@@ -71,7 +75,7 @@ if stdspec is None:
 print("Using '%s' to enable C++11 support" % (stdspec,))
 
 def has_gsl():
-    compiler = distutils.ccompiler.new_compiler()
+    compiler = new_compiler()
     return compiler.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
 
 # Our module
