@@ -24,7 +24,11 @@ This script shows how to use the profit_optim module to optimize a set of
 parameters using pyprofit.
 """
 
+import contextlib
+import functools
 import itertools
+import os
+import sys
 
 import pyfits
 from scipy import optimize
@@ -35,6 +39,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 from profit_optim import profit_setup_data, profit_like_model, to_pyprofit_image
 
+
+PY = sys.version_info
+if PY < (3,0,0):
+    import urllib  # @UnusedImport
+else:
+    import urllib.request as urllib
 
 def plot_image_comparison(fitsim, modelim, sigmaim, region):
     fig = plt.figure()
@@ -70,13 +80,23 @@ lowers = np.array((0,       0,       0,       0,       10,       10,       0,   
 uppers = np.array((1e3,     1e3,     1e3,     1e3,     30,       30,       2,      2,       1.3,    1.3,    360,      360,      0,     0,      1,     1))
 priors = np.array([prior_func(s) for s in sigmas])
 
-# Images on which we'll base the optimization
-basename = '/home/rtobar/scm/git/ProFit/inst/extdata/G265911'
-image = np.array(pyfits.getdata(basename + 'fitim.fits'))
-sigim = np.array(pyfits.getdata(basename + 'sigma.fits'))
-segim = np.array(pyfits.getdata(basename + 'segim.fits'))
-mask  = np.array(pyfits.getdata(basename + 'mskim.fits'))
-psf   = np.array(pyfits.getdata(basename + 'psfim.fits'))
+# The images used in this example are not part of our repository
+# We instead get a copy from the ProFit git repo (if not found already)
+def fits_data(fname):
+    if not os.path.exists(fname):
+        url = 'https://github.com/ICRAR/ProFit/raw/master/inst/extdata/KiDS/%s' % (fname)
+        print("Automatically downloading %s from ProFit's GitHub repo" % (fname,))
+        with contextlib.closing(urllib.urlopen(url)) as im, open(fname, "wb") as f:
+            for data in iter(functools.partial(im.read, 4096), b''):
+                f.write(data)
+    return np.array(pyfits.getdata(fname))
+
+basename = 'G265911'
+image = fits_data(basename + 'fitim.fits')
+sigim = fits_data(basename + 'sigma.fits')
+segim = fits_data(basename + 'segim.fits')
+mask  = fits_data(basename + 'mskim.fits')
+psf   = fits_data(basename + 'psfim.fits')
 
 def run():
 
