@@ -56,7 +56,7 @@ def to_pyprofit_image(params, data, use_mask=True):
 
     sparams = [{name: val for name, val in zip(fields, params)} for params in (s1params, s2params)]
     if data.verbose:
-        print sparams
+        print(sparams)
 
     profit_model = {'width':  data.image.shape[1],
                     'height': data.image.shape[0],
@@ -91,7 +91,7 @@ def profit_like_model(params, data):
     lp = -lp
 
     if data.verbose:
-        print lp, {name: val for name, val in zip(data.names, allparams)}
+        print(lp, {name: val for name, val in zip(data.names, allparams)})
     return lp
 
 def profit_setup_data(magzero,
@@ -104,7 +104,7 @@ def profit_setup_data(magzero,
     # All the center containing the PSF is considered, as well
     # as the section of the image containing the galaxy
     region = np.zeros(image.shape, dtype=bool)
-    region[(im_w - psf_w)/2:(im_w + psf_w)/2][(im_h - psf_h)/2:(im_h + psf_h)/2] = True
+    region[(im_w - psf_w)//2:(im_w + psf_w)//2][(im_h - psf_h)//2:(im_h + psf_h)//2] = True
     segim_center_pix = segim[int(math.ceil(im_w/2.))][int(math.ceil(im_h/2.))]
     region[segim == segim_center_pix] = True
 
@@ -137,6 +137,6 @@ def profit_setup_data(magzero,
     data.init = data.init[tofit]
 
     # Boundaries are scaled by sigma values as well
-    data.bounds = np.array(zip(lowers/sigmas,uppers/sigmas))[tofit]
+    data.bounds = np.array(list(zip(lowers/sigmas,uppers/sigmas)))[tofit]
 
     return data
