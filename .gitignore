@@ -1,6 +1,6 @@
 dist
 build
-pyprofit.so
+*.so
 *.egg-info
 .project
 .pydevproject
