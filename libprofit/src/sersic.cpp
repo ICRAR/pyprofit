@@ -166,7 +166,7 @@ template<> inline double _r_factor<false, SersicProfile::sixteen>(double b, doub
 template<bool boxy>
 inline double _base(double x, double y, double re, double exponent)
 {
-	return pow(fabs(x/re), exponent) + pow(fabs(y/re), exponent);
+	return pow(abs(x/re), exponent) + pow(abs(y/re), exponent);
 }
 
 template<>
@@ -190,25 +190,20 @@ inline double _invexp<false>(const double nser, const double exponent)
   return nser;
 }
 
+template<bool boxy, SersicProfile::nser_t t>
+static inline
+double eval_function(double x, double y, double box, double re, double nser, double bn) {
+	double exponent = box + 2;
+	double base = _base<boxy>(x, y, re, exponent);
+	double r_factor = _r_factor<boxy, t>(base,_invexp<boxy>(nser,exponent));
+	return exp(-bn * (r_factor - 1));
+}
 
 /*
  * The main sersic evaluation function for a given X/Y coordinate
  */
-template <bool boxy, SersicProfile::nser_t t>
-double SersicProfile::evaluate_at(double x, double y, double r, bool reuse_r) const {
-
-	double r_factor;
-	if( reuse_r && box == 0. ){
-		r_factor = pow(r/re, 1/nser);
-	}
-	else {
-		double base;
-		double exponent = box + 2;
-		base = _base<boxy>(x, y, re, exponent);
-		r_factor = _r_factor<boxy,t>(base,_invexp<boxy>(nser,exponent));
-	}
-
-	return exp(-_bn * (r_factor - 1));
+double SersicProfile::evaluate_at(double x, double y) const {
+	return m_eval_function(x, y, box, re, nser, _bn);
 }
 
 void SersicProfile::validate() {
@@ -225,35 +220,34 @@ void SersicProfile::validate() {
 }
 
 template <bool boxy, SersicProfile::nser_t t>
-eval_function_t SersicProfile::get_evaluation_function_t() {
-	return [](const RadialProfile &rp, double x, double y, double r, bool reuse_r) -> double {
-		auto sp = static_cast<const SersicProfile &>(rp);
-		return sp.evaluate_at<boxy, t>(x, y, r, reuse_r);
-	};
+void SersicProfile::init_eval_function() {
+	m_eval_function = eval_function<boxy, t>;
 }
 
-eval_function_t SersicProfile::get_evaluation_function() {
+void SersicProfile::evaluate(vector<double> &image) {
 
 	if( this->box != 0 ) {
-		     if( this->nser == 0.5 ) return get_evaluation_function_t<true, pointfive>();
-		else if( this->nser == 1 )   return get_evaluation_function_t<true, one>();
-		else if( this->nser == 2 )   return get_evaluation_function_t<true, two>();
-		else if( this->nser == 3 )   return get_evaluation_function_t<true, three>();
-		else if( this->nser == 4 )   return get_evaluation_function_t<true, four>();
-		else if( this->nser == 8 )   return get_evaluation_function_t<true, eight>();
-		else if( this->nser == 16 )  return get_evaluation_function_t<true, sixteen>();
-		else                         return get_evaluation_function_t<true, general>();
+		if( this->nser == 0.5 )     init_eval_function<true, pointfive>();
+		else if( this->nser == 1 )  init_eval_function<true, one>();
+		else if( this->nser == 2 )  init_eval_function<true, two>();
+		else if( this->nser == 3 )  init_eval_function<true, three>();
+		else if( this->nser == 4 )  init_eval_function<true, four>();
+		else if( this->nser == 8 )  init_eval_function<true, eight>();
+		else if( this->nser == 16 ) init_eval_function<true, sixteen>();
+		else                        init_eval_function<true, general>();
 	}
 	else {
-		     if( this->nser == 0.5 ) return get_evaluation_function_t<false, pointfive>();
-		else if( this->nser == 1 )   return get_evaluation_function_t<false, one>();
-		else if( this->nser == 2 )   return get_evaluation_function_t<false, two>();
-		else if( this->nser == 3 )   return get_evaluation_function_t<false, three>();
-		else if( this->nser == 4 )   return get_evaluation_function_t<false, four>();
-		else if( this->nser == 8 )   return get_evaluation_function_t<false, eight>();
-		else if( this->nser == 16 )  return get_evaluation_function_t<false, sixteen>();
-		else                         return get_evaluation_function_t<false, general>();
+		if( this->nser == 0.5 )     init_eval_function<false, pointfive>();
+		else if( this->nser == 1 )  init_eval_function<false, one>();
+		else if( this->nser == 2 )  init_eval_function<false, two>();
+		else if( this->nser == 3 )  init_eval_function<false, three>();
+		else if( this->nser == 4 )  init_eval_function<false, four>();
+		else if( this->nser == 8 )  init_eval_function<false, eight>();
+		else if( this->nser == 16 ) init_eval_function<false, sixteen>();
+		else                        init_eval_function<false, general>();
 	}
+
+	return RadialProfile::evaluate(image);
 }
 
 double SersicProfile::fluxfrac(double fraction) const {

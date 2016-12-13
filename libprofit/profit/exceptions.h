@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _EXCEPTIONS_H_
-#define _EXCEPTIONS_H_
+#ifndef PROFIT_EXCEPTIONS_H
+#define PROFIT_EXCEPTIONS_H
 
 #include <exception>
 #include <string>
@@ -52,4 +52,4 @@ private:
 
 } /* namespace profit */
 
-#endif /* _PROFIT_H_ */
+#endif /* PROFIT_EXCEPTIONS_H */

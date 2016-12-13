@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _RADIAL_H_
-#define _RADIAL_H_
+#ifndef PROFIT_RADIAL_H
+#define PROFIT_RADIAL_H
 
 #ifdef PROFIT_DEBUG
 #include <map>
@@ -36,23 +36,7 @@
 namespace profit
 {
 
-/** @defgroup Parameters */
-
 class RadialProfile;
-
-/**
- * The signature that all evaluation functions must follow.
- * Each profile uses a different evaluation function and provides it to the
- * RadialProfile for evaluation.
- *
- * @param profile The profile to evaluate
- * @param x The X profile coordinate to evaluate
- * @param y The Y profile coordinate to evaluate
- * @param r The pre-calculated radius of the profile for coordinate `(x,y)`
- * @param reuse_r Whether the value of `r` is valid (and can be reused) or not.
- * @return The value of the profile at the given point
- */
-typedef double (*eval_function_t)(const RadialProfile &profile, double x, double y, double r, bool reuse_r);
 
 /**
  * The base class for radial profiles.
@@ -98,6 +82,14 @@ protected:
 	virtual bool parameter_impl(const std::string &name, bool value) override;
 	virtual bool parameter_impl(const std::string &name, double value) override;
 	virtual bool parameter_impl(const std::string &name, unsigned int value) override;
+
+	/**
+	 * Calculates the profile value at profile coordinates ``x``/``y``.
+	 * @param x The X profile coordinate to evaluate
+	 * @param y The Y profile coordinate to evaluate
+	 * @return The value of the profile at the given point
+	 */
+	virtual double evaluate_at(double x, double y) const = 0;
 
 	/**
 	 * Performs the initial calculations needed by this profile during the
@@ -159,14 +151,6 @@ protected:
 	 * let the code self-adjust.
 	 */
 	virtual double adjust_rscale_max() = 0;
-
-	/**
-	 * Returns a pointer to the evaluation function, specific to each profile.
-	 * The evaluation function takes as input a X/Y coordinate in profile space
-	 * and returns a profile value. It receives a pre-computed radius as well
-	 * (assuming box == 0) which can be reused to avoid some extra computations.
-	 */
-	virtual eval_function_t get_evaluation_function() = 0;
 
 	/*
 	 * -------------------------
@@ -269,7 +253,6 @@ protected:
 	double _ie;
 	double _cos_ang;
 	double _sin_ang;
-	eval_function_t _eval_function;
 
 private:
 
@@ -285,4 +268,4 @@ private:
 
 } /* namespace profit */
 
-#endif /* _RADIAL_H_ */
+#endif /* PROFIT_RADIAL_H */

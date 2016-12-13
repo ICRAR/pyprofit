@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _BROKENEXPONENTIAL_H_
-#define _BROKENEXPONENTIAL_H_
+#ifndef PROFIT_BROKENEXPONENTIAL_H
+#define PROFIT_BROKENEXPONENTIAL_H
 
 #include "profit/radial.h"
 
@@ -74,7 +74,7 @@ protected:
 	double adjust_acc() override;
 	double adjust_rscale_switch() override;
 	double adjust_rscale_max() override;
-	eval_function_t get_evaluation_function() override;
+	double evaluate_at(double x, double y) const override;
 
 	/*
 	 * -------------------------
@@ -108,10 +108,9 @@ protected:
 private:
 
 	double integrate_at(double r) const;
-	double evaluate_at(double x, double y, double r, bool reuse_r) const;
 
 };
 
 } /* namespace profit */
 
-#endif /* _BROKENEXPONENTIAL_H_ */
+#endif /* PROFIT_BROKENEXPONENTIAL_H */

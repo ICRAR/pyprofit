@@ -50,27 +50,11 @@ namespace profit
  *           r = (x^{2+B} + y^{2+B})^{1/(2+B)}
  *           B = box parameter
  */
-double CoreSersicProfile::evaluate_at(double x, double y, double r, bool reuse_r) const {
-
-	if( box == 0 && !reuse_r ) {
-		r = sqrt(x*x + y*y);
-	}
-	else if( box != 0 ){
-		double box = this->box + 2.;
-		r = pow( pow(abs(x), box) + pow(abs(y), box), 1./box);
-	}
-	// else csp.box == 0 && reuse_r, so we leave r untouched
-
+double CoreSersicProfile::evaluate_at(double x, double y) const {
+	double box = this->box + 2.;
+	double r = pow( pow(abs(x), box) + pow(abs(y), box), 1./box);
 	return pow(1 + pow(r/rb,-a), b/a) *
 	       exp(-_bn * pow((pow(r, a) + pow(rb, a))/pow(re,a), 1/(nser*a)));
-
-}
-
-eval_function_t CoreSersicProfile::get_evaluation_function() {
-	return [](const RadialProfile &rp, double x, double y, double r, bool reuse_r) -> double {
-		auto &csp = static_cast<const CoreSersicProfile &>(rp);
-		return csp.evaluate_at(x, y, r, reuse_r);
-	};
 }
 
 void CoreSersicProfile::validate() {

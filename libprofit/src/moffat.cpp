@@ -51,18 +51,10 @@ namespace profit
  * Reducing:
  *  r_factor = ((x/rscale)^{2+b} + (y/rscale)^{2+b})^{1/(2+b)}
  */
-double MoffatProfile::evaluate_at(double x, double y, double r, bool reuse_r) const {
-
-	double r_factor;
-	if( box == 0 ) {
-		r_factor = sqrt(x*x + y*y);
-	}
-	else {
-		double box = 2 + this->box;
-		r_factor = pow( pow(abs(x), box) + pow(abs(y), box), 1./(box));
-	}
-
-	r_factor /= rscale;
+double MoffatProfile::evaluate_at(double x, double y) const {
+	double box = 2 + this->box;
+	double r = pow( pow(abs(x), box) + pow(abs(y), box), 1./(box));
+	double r_factor = r/rscale;
 	return pow(1 + r_factor*r_factor, -con);
 }
 
@@ -77,13 +69,6 @@ void MoffatProfile::validate() {
 		throw invalid_parameter("con < 0, must have con >= 0");
 	}
 
-}
-
-eval_function_t MoffatProfile::get_evaluation_function() {
-	return [](const RadialProfile &rp, double x, double y, double r, bool reuse_r) -> double {
-		auto mp = static_cast<const MoffatProfile &>(rp);
-		return mp.evaluate_at(x, y, r, reuse_r);
-	};
 }
 
 double MoffatProfile::get_lumtot(double r_box) {

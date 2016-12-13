@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _MODEL_H_
-#define _MODEL_H_
+#ifndef PROFIT_MODEL_H
+#define PROFIT_MODEL_H
 
 #include <string>
 #include <vector>
@@ -166,4 +166,4 @@ private:
 
 } /* namespace profit */
 
-#endif /* _MODEL_H_ */
+#endif /* PROFIT_MODEL_H */

@@ -49,17 +49,9 @@ namespace profit
  *       r = (x^{2+B} + y^{2+B})^{1/(2+B)}
  *       B = box parameter
  */
-double BrokenExponentialProfile::evaluate_at(double x, double y, double r, bool reuse_r) const {
-
-	if( !reuse_r && box == 0 ) {
-		r = sqrt(x*x + y*y);
-	}
-	else if( !reuse_r ) { // && bep.box != 0
-		double box = this->box + 2.;
-		r = pow( pow(abs(x), box) + pow(abs(y), box), 1./box);
-	}
-	// else reuse_r == true, so r is used as is
-
+double BrokenExponentialProfile::evaluate_at(double x, double y) const {
+	double box = this->box + 2.;
+	double r = pow( pow(abs(x), box) + pow(abs(y), box), 1./box);
 	return exp(-r/h1)*pow(1+exp(a*(r-rb)),(1/a)*(1/h1-1/h2));
 
 }
@@ -81,13 +73,6 @@ void BrokenExponentialProfile::validate() {
 		throw invalid_parameter("h2 > h1, must have h2 <= h1");
 	}
 
-}
-
-eval_function_t BrokenExponentialProfile::get_evaluation_function() {
-	return [](const RadialProfile &rp, double x, double y, double r, bool reuse_r) -> double {
-		auto &bep = static_cast<const BrokenExponentialProfile &>(rp);
-		return bep.evaluate_at(x, y, r, reuse_r);
-	};
 }
 
 double BrokenExponentialProfile::integrate_at(double r) const {

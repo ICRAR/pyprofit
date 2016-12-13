@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _COMMON_H_
-#define _COMMON_H_
+#ifndef PROFIT_COMMON_H
+#define PROFIT_COMMON_H
 
 /* M_PI is not part of C/C++, but usually there */
 #include <cmath>
@@ -38,4 +38,4 @@
 #define override
 #endif
 
-#endif /* _COMMON_H_ */
+#endif /* PROFIT_COMMON_H */

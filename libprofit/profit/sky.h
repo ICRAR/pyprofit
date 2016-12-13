@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _SKY_H_
-#define _SKY_H_
+#ifndef PROFIT_SKY_H
+#define PROFIT_SKY_H
 
 #include "profit/profile.h"
 
@@ -84,4 +84,4 @@ protected:
 
 } /* namespace profit */
 
-#endif /* _SKY_H_ */
+#endif /* PROFIT_SKY_H */

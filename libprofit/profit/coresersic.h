@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _CORESERSIC_H_
-#define _CORESERSIC_H_
+#ifndef PROFIT_CORESERSIC_H
+#define PROFIT_CORESERSIC_H
 
 #include "profit/radial.h"
 
@@ -71,13 +71,13 @@ protected:
 	 * Inherited from RadialProfile
 	 * ----------------------------
 	 */
+	void initial_calculations() override;
 	double get_lumtot(double r_box) override;
 	double get_rscale() override;
 	double adjust_acc() override;
 	double adjust_rscale_switch() override;
 	double adjust_rscale_max() override;
-	void initial_calculations() override;
-	eval_function_t get_evaluation_function() override;
+	double evaluate_at(double x, double y) const override;
 
 	/*
 	 * -------------------------
@@ -119,10 +119,9 @@ protected:
 private:
 
 	double integrate_at(double r) const;
-	double evaluate_at(double x, double y, double r, bool reuse_r) const;
 
 };
 
 } /* namespace profit */
 
-#endif /* _CORESERSIC_H_ */
+#endif /* PROFIT_CORESERSIC_H */

@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _FERRER_H_
-#define _FERRER_H_
+#ifndef PROFIT_FERRER_H
+#define PROFIT_FERRER_H
 
 #include "profit/radial.h"
 
@@ -74,7 +74,7 @@ protected:
 	double adjust_acc() override;
 	double adjust_rscale_switch() override;
 	double adjust_rscale_max() override;
-	eval_function_t get_evaluation_function() override;
+	double evaluate_at(double x, double y) const override;
 
 	/*
 	 * -------------------------
@@ -100,12 +100,8 @@ protected:
 	double b;
 	// @}
 
-private:
-
-	double evaluate_at(double x, double y, double r, bool reuse_r) const;
-
 };
 
 } /* namespace profit */
 
-#endif /* _FERRER_H_ */
+#endif /* PROFIT_FERRER_H */

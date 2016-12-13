@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _PROFILE_H_
-#define _PROFILE_H_
+#ifndef PROFIT_PROFILE_H
+#define PROFIT_PROFILE_H
 
 #include <string>
 #include <vector>
@@ -155,4 +155,4 @@ private:
 
 } /* namespace profit */
 
-#endif /* _PROFILE_H_ */
+#endif /* PROFIT_PROFILE_H */

@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _UTILS_H_
-#define _UTILS_H_
+#ifndef PROFIT_UTILS_H
+#define PROFIT_UTILS_H
 
 #include <vector>
 
@@ -114,4 +114,4 @@ double integrate_qags(integration_func_t f, double a, double b, void *params);
 
 } /* namespace profit */
 
-#endif /* _UTILS_H_ */
+#endif /* PROFIT_UTILS_H */

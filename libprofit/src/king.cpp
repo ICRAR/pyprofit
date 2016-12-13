@@ -50,16 +50,10 @@ namespace profit
  *       r = (x^{2+B} + y^{2+B})^{1/(2+B)}
  *       B = box parameter
  */
-double KingProfile::evaluate_at(double x, double y, double r, bool reuse_r) const {
+double KingProfile::evaluate_at(double x, double y) const {
 
-	if( !reuse_r && box == 0 ) {
-		r = sqrt(x*x + y*y);
-	}
-	else if( !reuse_r ) { // && kp.box != 0
-		double box = this->box + 2.;
-		r = pow( pow(abs(x), box) + pow(abs(y), box), 1./box);
-	}
-	// else reuse_r == true, so r is used as is
+	double box = this->box + 2.;
+	double r = pow( pow(abs(x), box) + pow(abs(y), box), 1./box);
 
 	if( r < rt ) {
 		return pow(1/pow(1 + pow(r/rc, 2), 1/a) - 1/pow(1 + pow(rt/rc, 2), 1/a), a);
@@ -76,19 +70,12 @@ void KingProfile::validate() {
 		throw invalid_parameter("rc <= 0, must have rc > 0");
 	}
 	if ( rt <= 0 ) {
-		throw invalid_parameter("rt <= 0, must have rc > 0");
+		throw invalid_parameter("rt <= 0, must have rt > 0");
 	}
 	if ( a < 0 ) {
 		throw invalid_parameter("a < 0, must have a >=0");
 	}
 
-}
-
-eval_function_t KingProfile::get_evaluation_function() {
-	return [](const RadialProfile &rp, double x, double y, double r, bool reuse_r) -> double {
-		auto kp = static_cast<const KingProfile &>(rp);
-		return kp.evaluate_at(x, y, r, reuse_r);
-	};
 }
 
 double KingProfile::integrate_at(double r) const {

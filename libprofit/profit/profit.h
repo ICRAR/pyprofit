@@ -24,8 +24,8 @@
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _PROFIT_H_
-#define _PROFIT_H_
+#ifndef PROFIT_PROFIT_H
+#define PROFIT_PROFIT_H
 
 #include "profit/common.h"
 #include "profit/convolve.h"
@@ -33,4 +33,4 @@
 #include "profit/model.h"
 #include "profit/profile.h"
 
-#endif /* _PROFIT_H_ */
+#endif /* PROFIT_PROFIT_H */

@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _SERSIC_H_
-#define _SERSIC_H_
+#ifndef PROFIT_SERSIC_H
+#define PROFIT_SERSIC_H
 
 #include "profit/radial.h"
 
@@ -85,6 +85,7 @@ protected:
 	 * Inherited from RadialProfile
 	 * ----------------------------
 	 */
+	void evaluate(std::vector<double> &image) override;
 	void initial_calculations() override;
 	void subsampling_params(double x, double y, unsigned int &res, unsigned int &max_rec) override;
 	double get_pixel_scale() override;
@@ -94,7 +95,8 @@ protected:
 	double adjust_acc() override;
 	double adjust_rscale_switch() override;
 	double adjust_rscale_max() override;
-	eval_function_t get_evaluation_function() override;
+	double evaluate_at(double x, double y) const override;
+
 
 	/*
 	 * -------------------------
@@ -126,11 +128,10 @@ protected:
 
 private:
 
-	template <bool boxy, nser_t t>
-	double evaluate_at(double x, double y, double r, bool reuse_r) const;
+	double (*m_eval_function)(double x, double y, double box, double re, double nser, double bn);
 
-	template <bool boxy, nser_t t>
-	eval_function_t get_evaluation_function_t();
+	template <bool boxy, SersicProfile::nser_t t>
+	void init_eval_function();
 
 	double fluxfrac(double fraction) const;
 
@@ -138,4 +139,4 @@ private:
 
 } /* namespace profit */
 
-#endif /* _SERSIC_H_ */
+#endif /* PROFIT_SERSIC_H */

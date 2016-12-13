@@ -23,8 +23,8 @@
  * You should have received a copy of the GNU General Public License
  * along with libprofit.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef _PSF_H_
-#define _PSF_H_
+#ifndef PROFIT_PSF_H
+#define PROFIT_PSF_H
 
 #include "profit/profile.h"
 
@@ -94,4 +94,4 @@ protected:
 
 } /* namespace profit */
 
-#endif /* _PSF_H_ */
+#endif /* PROFIT_PSF_H */
