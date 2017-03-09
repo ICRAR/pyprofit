@@ -109,10 +109,23 @@ def opencl_include():
     return "OpenCL/opencl.h" if sys.platform == "darwin" else "CL/opencl.h"
 
 def has_opencl():
+
+    # User doesn't want OpenCL support
     if 'PYPROFIT_NO_OPENCL' in os.environ:
         return False
-    compiler = new_compiler()
-    return compiler.has_function('clCreateContext', libraries=['OpenCL'])
+
+    # Check the headers are actually there
+    code = """
+        #include <%s>
+        int main() {}
+        """ % (opencl_include())
+    if not compiles(code):
+        print("OpenCL headers not found")
+        return False
+
+    # Check the library can be linked
+    with mute_compiler() as c:
+        return c.has_function('clCreateContext', libraries=['OpenCL'])
 
 def max_opencl_ver():
 
