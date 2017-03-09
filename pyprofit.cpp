@@ -26,6 +26,7 @@
 
 #include <Python.h>
 
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -40,8 +41,11 @@ using namespace profit;
 
 /* Python 2/3 compatibility */
 #if PY_MAJOR_VERSION >= 3
-	#define PyInt_AsLong              PyLong_AsLong
-	#define PyInt_AsUnsignedLongMask  PyLong_AsUnsignedLongMask
+	#define PyInt_AsLong               PyLong_AsLong
+	#define PyInt_AsUnsignedLongMask   PyLong_AsUnsignedLongMask
+	#define STRING_FROM_UTF8(val, len) PyUnicode_FromStringAndSize((const char *)val, len)
+#else
+	#define STRING_FROM_UTF8(val, len) PyString_FromStringAndSize((const char *)val, len)
 #endif
 
 /* Macros */
@@ -437,8 +441,50 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	return image_tuple;
 }
 
+static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
+#ifdef PROFIT_OPENCL
+
+	const auto clinfo = get_opencl_info();
+	PyObject *p_clinfo = PyList_New(clinfo.size());
+	unsigned int plat = 0;
+	for(auto platform_info: clinfo) {
+
+		auto plat_info = std::get<1>(platform_info);
+
+		unsigned int dev = 0;
+		PyObject *p_devsinfo = PyList_New(plat_info.dev_info.size());
+		for(auto device_info: plat_info.dev_info) {
+
+			PyObject *double_support = std::get<1>(device_info).double_support ? Py_True : Py_False;
+			Py_INCREF(double_support);
+
+			std::string name = move(std::get<1>(device_info).name);
+			PyObject *p_name = STRING_FROM_UTF8(name.c_str(), name.size());
+			PyObject *p_devinfo = PyTuple_New(2);
+			PyTuple_SetItem(p_devinfo, 0, p_name);
+			PyTuple_SetItem(p_devinfo, 1, double_support);
+			PyList_SetItem(p_devsinfo, dev++, p_devinfo);
+		}
+
+		std::string name = move(plat_info.name);
+		PyObject *p_name = STRING_FROM_UTF8(name.c_str(), name.size());
+
+		PyObject *p_platinfo = PyTuple_New(3);
+		PyTuple_SetItem(p_platinfo, 0, p_name);
+		PyTuple_SetItem(p_platinfo, 1, PyFloat_FromDouble(plat_info.supported_opencl_version/100.));
+		PyTuple_SetItem(p_platinfo, 2, p_devsinfo);
+		PyList_SetItem(p_clinfo, plat++, p_platinfo);
+	}
+
+	return p_clinfo;
+
+#endif /* PROFIT_OPENCL */
+	PYPROFIT_RAISE("No OpenCL support in this pyprofit, recompile if necessary");
+}
+
 static PyMethodDef pyprofit_methods[] = {
-    {"make_model",  pyprofit_make_model, METH_VARARGS, "Creates a profit model."},
+    {"make_model",  pyprofit_make_model,  METH_VARARGS, "Creates a profit model."},
+    {"opencl_info", pyprofit_opencl_info, METH_NOARGS,  "Gets OpenCL environment information."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
