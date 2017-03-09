@@ -48,6 +48,9 @@ using namespace profit;
 	#define STRING_FROM_UTF8(val, len) PyString_FromStringAndSize((const char *)val, len)
 #endif
 
+/* Exceptions */
+static PyObject *profit_error;
+
 /* Macros */
 #define PYPROFIT_RAISE(str) \
 	do { \
@@ -55,6 +58,120 @@ using namespace profit;
 		return NULL; \
 	} while (0)
 
+
+/* OpenCL-related methods/object */
+static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
+#ifdef PROFIT_OPENCL
+
+	std::map<int, OpenCL_plat_info> clinfo;
+	try {
+		clinfo = get_opencl_info();
+	} catch (const opencl_error &e) {
+		std::ostringstream os;
+		os << "Error while getting OpenCL information: " << e.what();
+		PYPROFIT_RAISE(os.str().c_str());
+	}
+
+	PyObject *p_clinfo = PyList_New(clinfo.size());
+	unsigned int plat = 0;
+	for(auto platform_info: clinfo) {
+
+		auto plat_info = std::get<1>(platform_info);
+
+		unsigned int dev = 0;
+		PyObject *p_devsinfo = PyList_New(plat_info.dev_info.size());
+		for(auto device_info: plat_info.dev_info) {
+
+			PyObject *double_support = std::get<1>(device_info).double_support ? Py_True : Py_False;
+			Py_INCREF(double_support);
+
+			std::string name = std::move(std::get<1>(device_info).name);
+			PyObject *p_name = STRING_FROM_UTF8(name.c_str(), name.size());
+			PyObject *p_devinfo = PyTuple_New(2);
+			PyTuple_SetItem(p_devinfo, 0, p_name);
+			PyTuple_SetItem(p_devinfo, 1, double_support);
+			PyList_SetItem(p_devsinfo, dev++, p_devinfo);
+		}
+
+		std::string name = std::move(plat_info.name);
+		PyObject *p_name = STRING_FROM_UTF8(name.c_str(), name.size());
+
+		PyObject *p_platinfo = PyTuple_New(3);
+		PyTuple_SetItem(p_platinfo, 0, p_name);
+		PyTuple_SetItem(p_platinfo, 1, PyFloat_FromDouble(plat_info.supported_opencl_version/100.));
+		PyTuple_SetItem(p_platinfo, 2, p_devsinfo);
+		PyList_SetItem(p_clinfo, plat++, p_platinfo);
+	}
+
+	return p_clinfo;
+
+#endif /* PROFIT_OPENCL */
+	PYPROFIT_RAISE("No OpenCL support in this pyprofit, recompile if necessary");
+}
+
+#ifdef PROFIT_OPENCL
+/*
+ * openclenv object structure
+ */
+typedef struct {
+    PyObject_HEAD
+    std::shared_ptr<OpenCL_env> env;
+} OpenclEnv;
+
+
+/*
+ * __init__, destructor
+ */
+static int openclenv_init(OpenclEnv *self, PyObject *args, PyObject *kwargs) {
+
+	unsigned int plat_idx, dev_idx;
+	PyObject *use_double_o;
+
+	char *kwlist[] = {"plat_idx", "dev_idx", "use_double", NULL};
+	if( !PyArg_ParseTupleAndKeywords(args, kwargs, "IIO", kwlist,
+	                                 &plat_idx, &dev_idx, &use_double_o) ) {
+		return -1;
+	}
+
+	int use_double = PyObject_IsTrue(use_double_o);
+	if( use_double == -1 ) {
+		return -1;
+	}
+
+	try {
+		self->env = get_opencl_environment(plat_idx, dev_idx, static_cast<bool>(use_double), false);
+	} catch (const opencl_error &e) {
+		std::ostringstream os;
+		os << "Error while getting OpenCL information: " << e.what();
+		PyErr_SetString(profit_error, os.str().c_str());
+		return -1;
+	}
+
+	return 0;
+}
+
+static void openclenv_dealloc(OpenclEnv *self) {
+	self->env.reset();
+	Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+/*
+ * openclenv object type
+ */
+static PyTypeObject OpenclEnv_Type = {
+#if PY_MAJOR_VERSION >= 3
+	PyVarObject_HEAD_INIT(NULL, 0)
+#else
+	PyObject_HEAD_INIT(NULL)
+	0,                             /*ob_size*/
+#endif
+	"pyprofit.openclenv",          /*tp_name*/
+	sizeof(OpenclEnv),             /*tp_basicsize*/
+};
+#endif /* PROFIT_OPENCL */
+
+
+/* Utility methods */
 void read_double(std::shared_ptr<Profile> &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
@@ -75,9 +192,6 @@ void read_uint(std::shared_ptr<Profile> &p, PyObject *item, const char *key) {
 		p->parameter(key, (unsigned int)PyInt_AsUnsignedLongMask(tmp));
 	}
 }
-
-/* Exceptions */
-static PyObject *profit_error;
 
 /* Methods */
 static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, unsigned int *matrix_height) {
@@ -389,6 +503,18 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	}
 	READ_DOUBLE(model_dict, "magzero", m.magzero);
 
+#ifdef PROFIT_OPENCL
+	/* Assign the OpenCL environment to the model */
+	PyObject *p_openclenv = PyDict_GetItemString(model_dict, "openclenv");
+	if( p_openclenv != NULL ) {
+		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
+		if( !openclenv ) {
+			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
+		}
+		m.opencl_env = openclenv->env;
+	}
+#endif /* PROFIT_OPENCL */
+
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
 	_read_moffat_profiles(m, profiles_dict);
@@ -441,47 +567,9 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	return image_tuple;
 }
 
-static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
-#ifdef PROFIT_OPENCL
-
-	const auto clinfo = get_opencl_info();
-	PyObject *p_clinfo = PyList_New(clinfo.size());
-	unsigned int plat = 0;
-	for(auto platform_info: clinfo) {
-
-		auto plat_info = std::get<1>(platform_info);
-
-		unsigned int dev = 0;
-		PyObject *p_devsinfo = PyList_New(plat_info.dev_info.size());
-		for(auto device_info: plat_info.dev_info) {
-
-			PyObject *double_support = std::get<1>(device_info).double_support ? Py_True : Py_False;
-			Py_INCREF(double_support);
-
-			std::string name = move(std::get<1>(device_info).name);
-			PyObject *p_name = STRING_FROM_UTF8(name.c_str(), name.size());
-			PyObject *p_devinfo = PyTuple_New(2);
-			PyTuple_SetItem(p_devinfo, 0, p_name);
-			PyTuple_SetItem(p_devinfo, 1, double_support);
-			PyList_SetItem(p_devsinfo, dev++, p_devinfo);
-		}
-
-		std::string name = move(plat_info.name);
-		PyObject *p_name = STRING_FROM_UTF8(name.c_str(), name.size());
-
-		PyObject *p_platinfo = PyTuple_New(3);
-		PyTuple_SetItem(p_platinfo, 0, p_name);
-		PyTuple_SetItem(p_platinfo, 1, PyFloat_FromDouble(plat_info.supported_opencl_version/100.));
-		PyTuple_SetItem(p_platinfo, 2, p_devsinfo);
-		PyList_SetItem(p_clinfo, plat++, p_platinfo);
-	}
-
-	return p_clinfo;
-
-#endif /* PROFIT_OPENCL */
-	PYPROFIT_RAISE("No OpenCL support in this pyprofit, recompile if necessary");
-}
-
+/*
+ * Methods in the pyprofit module
+ */
 static PyMethodDef pyprofit_methods[] = {
     {"make_model",  pyprofit_make_model,  METH_VARARGS, "Creates a profit model."},
     {"opencl_info", pyprofit_opencl_info, METH_NOARGS,  "Gets OpenCL environment information."},
@@ -524,6 +612,19 @@ MOD_INIT(pyprofit)
 	if( PyModule_AddObject(m, "error", profit_error) == -1 ) {
 		return MOD_VAL(NULL);
 	}
+
+#ifdef PROFIT_OPENCL
+	OpenclEnv_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+	OpenclEnv_Type.tp_doc = "An OpenCL environment";
+	OpenclEnv_Type.tp_new = PyType_GenericNew;
+	OpenclEnv_Type.tp_dealloc = (destructor)openclenv_dealloc;
+	OpenclEnv_Type.tp_init = (initproc)openclenv_init;
+	if( PyType_Ready(&OpenclEnv_Type) < 0 ) {
+		return MOD_VAL(NULL);
+	}
+	Py_INCREF(&OpenclEnv_Type);
+	PyModule_AddObject(m, "openclenv", (PyObject *)&OpenclEnv_Type);
+#endif /* PROFIT_OPENCL */
 
 	return MOD_VAL(m);
 }
