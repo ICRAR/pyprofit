@@ -17,7 +17,7 @@ addons:
 # Run the build and make sure we can at least import pyprofit correctly
 script:
  - python setup.py install
- - python -c "import pyprofit; width=500; height=500; sp = {'xcen': width/2, 'ycen': height/2, 'mag': 15, 'ang': 0, 'box': 0.4, 'axrat': 0.3, 'nser': 4, 're': width/4}; model = {'width': width, 'height': height, 'profiles': {'sersic': [sp]}}; pyprofit.make_model(model)"
+ - python -c "import pyprofit; width=500; height=500; sp = {'xcen'{{':'}} width/2, 'ycen'{{':'}} height/2, 'mag'{{':'}} 15, 'ang'{{':'}} 0, 'box'{{':'}} 0.4, 'axrat'{{':'}} 0.3, 'nser'{{':'}} 4, 're'{{':'}} width/4}; model = {'width'{{':'}} width, 'height'{{':'}} height, 'profiles'{{':'}} {'sersic'{{':'}} [sp]}}; pyprofit.make_model(model)"
 
 # safelist
 branches:
