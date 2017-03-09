@@ -26,6 +26,7 @@
 
 #include <Python.h>
 
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -50,24 +51,24 @@ using namespace profit;
 		return NULL; \
 	} while (0)
 
-void read_double(Profile &p, PyObject *item, const char *key) {
+void read_double(std::shared_ptr<Profile> &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
-		p.parameter(key, PyFloat_AsDouble(tmp));
+		p->parameter(key, PyFloat_AsDouble(tmp));
 	}
 }
 
-void read_bool(Profile &p, PyObject *item, const char *key) {
+void read_bool(std::shared_ptr<Profile> &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
-		p.parameter(key, (bool)PyObject_IsTrue(tmp));
+		p->parameter(key, (bool)PyObject_IsTrue(tmp));
 	}
 }
 
-void read_uint(Profile &p, PyObject *item, const char *key) {
+void read_uint(std::shared_ptr<Profile> &p, PyObject *item, const char *key) {
 	PyObject *tmp = PyDict_GetItemString(item, key);
 	if( tmp != NULL ) {
-		p.parameter(key, (unsigned int)PyInt_AsUnsignedLongMask(tmp));
+		p->parameter(key, (unsigned int)PyInt_AsUnsignedLongMask(tmp));
 	}
 }
 
@@ -126,7 +127,7 @@ static bool *_read_boolean_matrix(PyObject *matrix, unsigned int *matrix_width, 
 	return bools;
 }
 
-static void _item_to_radial_profile(Profile &profile, PyObject *item) {
+static void _item_to_radial_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	read_double(profile, item, "xcen");
 	read_double(profile, item, "ycen");
 	read_double(profile, item, "mag");
@@ -143,27 +144,27 @@ static void _item_to_radial_profile(Profile &profile, PyObject *item) {
 	read_bool(profile, item, "adjust");
 }
 
-static void _item_to_sersic_profile(Profile &profile, PyObject *item) {
+static void _item_to_sersic_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	read_double(profile, item, "re");
 	read_double(profile, item, "nser");
 	read_bool(profile, item, "rescale_flux");
 }
 
-static void _item_to_moffat_profile(Profile &profile, PyObject *item) {
+static void _item_to_moffat_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	read_double(profile, item, "fwhm");
 	read_double(profile, item, "con");
 }
 
-static void _item_to_ferrer_profile(Profile &profile, PyObject *item) {
+static void _item_to_ferrer_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	read_double(profile, item, "rout");
 	read_double(profile, item, "a");
 	read_double(profile, item, "b");
 }
 
-static void _item_to_coresersic_profile(Profile &profile, PyObject *item) {
+static void _item_to_coresersic_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	read_double(profile, item, "re");
 	read_double(profile, item, "rb");
@@ -172,7 +173,7 @@ static void _item_to_coresersic_profile(Profile &profile, PyObject *item) {
 	read_double(profile, item, "b");
 }
 
-static void _item_to_brokenexp_profile(Profile &profile, PyObject *item) {
+static void _item_to_brokenexp_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	read_double(profile, item, "h1");
 	read_double(profile, item, "h2");
@@ -180,24 +181,24 @@ static void _item_to_brokenexp_profile(Profile &profile, PyObject *item) {
 	read_double(profile, item, "a");
 }
 
-static void _item_to_king_profile(Profile &profile, PyObject *item) {
+static void _item_to_king_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	_item_to_radial_profile(profile, item);
 	read_double(profile, item, "rc");
 	read_double(profile, item, "rt");
 	read_double(profile, item, "a");
 }
 
-static void _item_to_sky_profile(Profile &profile, PyObject *item) {
+static void _item_to_sky_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	read_double(profile, item, "bg");
 }
 
-static void _item_to_psf_profile(Profile &profile, PyObject *item) {
+static void _item_to_psf_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	read_double(profile, item, "xcen");
 	read_double(profile, item, "ycen");
 	read_double(profile, item, "mag");
 }
 
-void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, void (item_to_profile)(Profile &, PyObject *item)) {
+void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, void (item_to_profile)(std::shared_ptr<Profile> &p, PyObject *item)) {
 
 	PyObject *profile_sequence = PyDict_GetItemString(profiles_dict, name);
 	if( profile_sequence == NULL ) {
@@ -208,7 +209,7 @@ void _read_profiles(Model &model, PyObject *profiles_dict, const char *name, voi
 	for(Py_ssize_t i = 0; i!= length; i++) {
 		PyObject *item = PySequence_GetItem(profile_sequence, i);
 		try {
-			Profile &p = model.add_profile(name);
+			auto p = model.add_profile(name);
 			read_bool(p, item, "convolve");
 			item_to_profile(p, item);
 		} catch(invalid_parameter &e) {
