@@ -29,14 +29,53 @@ import tempfile
 
 from setuptools import setup, Extension
 
-def new_compiler():
-    compiler = distutils.ccompiler.new_compiler()
-    distutils.sysconfig.customize_compiler(compiler) # CC, CFLAGS, LDFLAGS, etc
-    return compiler
+class mute_compiler(object):
 
-# Check how C++11 has to be specified
+    def __init__(self):
+        self.devnull = self.oldstderr = None
+
+    def __enter__(self):
+        if os.name == 'posix':
+            self.devnull = open(os.devnull, 'w')
+            self.oldstderr = os.dup(sys.stderr.fileno())
+            os.dup2(self.devnull.fileno(), sys.stderr.fileno())
+
+        compiler = distutils.ccompiler.new_compiler()
+        distutils.sysconfig.customize_compiler(compiler) # CC, CFLAGS, LDFLAGS, etc
+        return compiler
+
+    def __exit__(self, typ, err, st):
+        if self.oldstderr is not None:
+            os.dup2(self.oldstderr, sys.stderr.fileno())
+        if self.devnull is not None:
+            self.devnull.close()
+
+def compiles(code=None, source_fname=None, *args, **kwargs):
+
+    if (code and source_fname) or (not code and not source_fname):
+        raise ValueError("code XOR source_fname")
+
+    if code:
+        source_fname = tempfile.mktemp(suffix='.cpp')
+        with open(source_fname, 'w') as f:
+            f.write(code)
+
+    devnull = oldstderr = None
+    try:
+        with mute_compiler() as c:
+            object_fnames = c.compile([source_fname], *args, **kwargs)
+        os.remove(object_fnames[0])
+        return True
+    except distutils.errors.CompileError:
+        return False
+    finally:
+        # We wrote it, we take care of it
+        if code:
+            os.remove(source_fname)
+
 def get_cpp11_stdspec():
 
+    # User knows already how to do it
     if 'PYPROFIT_CXX11' in os.environ:
         return os.environ['PYPROFIT_CXX11']
 
@@ -54,20 +93,17 @@ def get_cpp11_stdspec():
 
     stdspec = None
     for stdspec_ in ['-std=c++11', '-std=c++0x', '-std=c++', '']:
-        try:
-            compiler = new_compiler()
-            object_fnames = compiler.compile([source_fname], extra_postargs=[stdspec_] if stdspec_ else [])
+        print("-- Trying compiler argument '%s' to enable C++11 support" % (stdspec_))
+        extra_postargs=[stdspec_] if stdspec_ else []
+        if compiles(source_fname=source_fname, extra_postargs=extra_postargs):
             stdspec = stdspec_
-            os.remove(object_fnames[0])
             break
-        except distutils.errors.CompileError:
-            continue
     os.remove(source_fname)
     return stdspec
 
 def has_gsl():
-    compiler = new_compiler()
-    return compiler.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
+    with mute_compiler() as c:
+        return c.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
 
 def opencl_include():
     return "OpenCL/opencl.h" if sys.platform == "darwin" else "CL/opencl.h"
@@ -80,11 +116,10 @@ def has_opencl():
 
 def max_opencl_ver():
 
-    compiler = new_compiler()
     inc = opencl_include()
-
     for ver in ((2,0), (1,2), (1,1), (1,0)):
         maj,min = ver
+        print("-- Looking for OpenCL %d.%d" % (maj, min))
 
         code = """
         #include <iostream>
@@ -94,19 +129,8 @@ def max_opencl_ver():
             std::cout << CL_VERSION_%d_%d << std::endl;
         }
         """ % (inc, maj, min)
-        source_fname = tempfile.mktemp(suffix='.cpp')
-        with open(source_fname, 'w') as f:
-            f.write(code)
-
-        try:
-            compiler = new_compiler()
-            object_fnames = compiler.compile([source_fname])
-            os.remove(object_fnames[0])
-            return ver
-        except distutils.errors.CompileError:
-            pass
-        finally:
-            os.remove(source_fname)
+        if compiles(code):
+            return maj,min
 
 # Our module
 pyprofit_sources = ['pyprofit.cpp']
@@ -121,16 +145,16 @@ defines = [('PROFIT_BUILD', 1)]
 
 stdspec = get_cpp11_stdspec()
 if stdspec is None:
-    print("No C/C++ compiler with C++11 support found."
+    print("\n\nNo C/C++ compiler with C++11 support found."
           "Use the CC environment variable to specify a different compiler if you have one.\n"
           "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches "
           "(e.g., PYPROFIT_CXX11='-std c++11')")
     sys.exit(1)
-print("Using '%s' to enable C++11 support" % (stdspec,))
+print("-- Using '%s' to enable C++11 support" % (stdspec,))
 
 # gsl libs
 if not has_gsl():
-    print("\n\nNo GSL installation found on your system. Install the GSL development package and try again\n\n")
+    print("\n\n-- No GSL installation found on your system. Install the GSL development package and try again\n\n")
     sys.exit(1)
 
 libs = ['gsl', 'gslcblas']
@@ -139,11 +163,13 @@ defines.append(('HAVE_GSL',1))
 # OpenCL support
 if has_opencl():
     maj,min = max_opencl_ver()
-    print("Compiling pyprofit with OpenCL %d.%d support" % (maj, min))
+    print("-- Compiling pyprofit with OpenCL %d.%d support" % (maj, min))
     libs.append('OpenCL')
     defines.append(('PROFIT_OPENCL',1))
     defines.append(('PROFIT_OPENCL_MAJOR', maj))
     defines.append(('PROFIT_OPENCL_MINOR', min))
+else:
+    print("-- Compiling pyprofit without OpenCL support")
 
 pyprofit_ext = Extension('pyprofit',
                        depends=glob.glob('libprofit/profit/*.h'),
