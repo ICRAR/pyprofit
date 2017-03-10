@@ -21,6 +21,7 @@
 #
 import distutils
 import distutils.ccompiler
+from distutils.dep_util import newer_group
 import distutils.errors
 import glob
 import os
@@ -28,6 +29,9 @@ import sys
 import tempfile
 
 from setuptools import setup, Extension
+import setuptools
+from setuptools.command.build_ext import build_ext
+
 
 class mute_compiler(object):
 
@@ -145,53 +149,81 @@ def max_opencl_ver():
         if compiles(code):
             return maj,min
 
-# Our module
-pyprofit_sources = ['pyprofit.cpp']
+class configure(setuptools.Command):
+    """Configure command to enrich the pyprofit extension"""
 
-# libprofit sources
-pyprofit_sources += glob.glob('libprofit/src/*.cpp')
+    def initialize_options(self):
+        pass
+    finalize_options = initialize_options
+    description = 'Configures the pyprofit extension'
+    user_options = []
 
-# include dirs
-incdirs = ['libprofit']
+    def run(self):
 
-defines = [('PROFIT_BUILD', 1)]
+        # We should only be configuring the pyprofit module
+        assert(len(self.distribution.ext_modules) == 1)
+        pyprofit_ext = self.distribution.ext_modules[0]
 
-stdspec = get_cpp11_stdspec()
-if stdspec is None:
-    print("\n\nNo C/C++ compiler with C++11 support found."
-          "Use the CC environment variable to specify a different compiler if you have one.\n"
-          "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches "
-          "(e.g., PYPROFIT_CXX11='-std c++11')")
-    sys.exit(1)
-print("-- Using '%s' to enable C++11 support" % (stdspec,))
+        # Find (if any) the C++11 flag required to compile our code
+        stdspec = get_cpp11_stdspec()
+        if stdspec is None:
+            print("\n\nNo C/C++ compiler with C++11 support found."
+                  "Use the CC environment variable to specify a different compiler if you have one.\n"
+                  "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches "
+                  "(e.g., PYPROFIT_CXX11='-std c++11')")
+            sys.exit(1)
+        print("-- Using '%s' to enable C++11 support" % (stdspec,))
 
-# gsl libs
-if not has_gsl():
-    print("\n\n-- No GSL installation found on your system. Install the GSL development package and try again\n\n")
-    sys.exit(1)
+        # Scan for GSL
+        if not has_gsl():
+            print("\n\n-- No GSL installation found on your system. Install the GSL development package and try again\n\n")
+            sys.exit(1)
 
-libs = ['gsl', 'gslcblas']
-defines.append(('HAVE_GSL',1))
+        libs = ['gsl', 'gslcblas']
+        defines = [('PROFIT_BUILD', 1), ('HAVE_GSL',1)]
+        extra_compile_args=[stdspec] if stdspec else []
 
-# OpenCL support
-if has_opencl():
-    maj,min = max_opencl_ver()
-    print("-- Compiling pyprofit with OpenCL %d.%d support" % (maj, min))
-    libs.append('OpenCL')
-    defines.append(('PROFIT_OPENCL',1))
-    defines.append(('PROFIT_OPENCL_MAJOR', maj))
-    defines.append(('PROFIT_OPENCL_MINOR', min))
-else:
-    print("-- Compiling pyprofit without OpenCL support")
+        # Optional OpenCL support
+        if has_opencl():
+            maj,min = max_opencl_ver()
+            print("-- Compiling pyprofit with OpenCL %d.%d support" % (maj, min))
+            libs.append('OpenCL')
+            defines.append(('PROFIT_OPENCL',1))
+            defines.append(('PROFIT_OPENCL_MAJOR', maj))
+            defines.append(('PROFIT_OPENCL_MINOR', min))
+        else:
+            print("-- Compiling pyprofit without OpenCL support")
 
+        pyprofit_ext.libraries = libs
+        pyprofit_ext.define_macros = defines
+        pyprofit_ext.extra_compile_args = extra_compile_args
+
+class _build_ext(build_ext):
+    """Custom build_ext command that includes the configure command"""
+
+    def run(self):
+
+        assert(len(self.distribution.ext_modules) == 1)
+        ext = self.distribution.ext_modules[0]
+
+        # Don't even run configure if not necessary
+        ext_path = self.get_ext_fullpath(ext.name)
+        depends = ext.sources + ext.depends
+        if not (self.force or newer_group(depends, ext_path, 'newer')):
+            distutils.log.debug("skipping '%s' extension (up-to-date)", ext.name)
+            return
+
+        self.run_command('configure')
+        build_ext.run(self)
+
+
+# The initial definition of the pyprofit module
+# It is enriched during the 'configure' step
 pyprofit_ext = Extension('pyprofit',
                        depends=glob.glob('libprofit/profit/*.h') + glob.glob('libprofit/profit/cl/*'),
                        language='c++',
-                       define_macros = defines,
-                       sources = pyprofit_sources,
-                       include_dirs = incdirs,
-                       libraries = libs,
-                       extra_compile_args=[stdspec] if stdspec else [])
+                       sources = ['pyprofit.cpp'] + glob.glob('libprofit/src/*.cpp'),
+                       include_dirs = ['libprofit'])
 
 setup(
       name='pyprofit',
@@ -212,5 +244,9 @@ setup(
           "Programming Language :: Python :: 3.5",
           "Topic :: Scientific/Engineering :: Astronomy"
       ],
-      ext_modules = [pyprofit_ext]
+      ext_modules = [pyprofit_ext],
+      cmdclass = {
+        'configure': configure,
+        'build_ext': _build_ext,
+      }
 )
