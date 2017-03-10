@@ -185,7 +185,7 @@ else:
     print("-- Compiling pyprofit without OpenCL support")
 
 pyprofit_ext = Extension('pyprofit',
-                       depends=glob.glob('libprofit/profit/*.h'),
+                       depends=glob.glob('libprofit/profit/*.h') + glob.glob('libprofit/profit/cl/*'),
                        language='c++',
                        define_macros = defines,
                        sources = pyprofit_sources,
