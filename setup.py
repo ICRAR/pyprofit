@@ -42,7 +42,9 @@ class mute_compiler(object):
         if os.name == 'posix':
             self.devnull = open(os.devnull, 'w')
             self.oldstderr = os.dup(sys.stderr.fileno())
+            self.oldstdout = os.dup(sys.stdout.fileno())
             os.dup2(self.devnull.fileno(), sys.stderr.fileno())
+            os.dup2(self.devnull.fileno(), sys.stdout.fileno())
 
         compiler = distutils.ccompiler.new_compiler()
         distutils.sysconfig.customize_compiler(compiler) # CC, CFLAGS, LDFLAGS, etc
@@ -51,6 +53,7 @@ class mute_compiler(object):
     def __exit__(self, typ, err, st):
         if self.oldstderr is not None:
             os.dup2(self.oldstderr, sys.stderr.fileno())
+            os.dup2(self.oldstdout, sys.stdout.fileno())
         if self.devnull is not None:
             self.devnull.close()
 
@@ -97,7 +100,7 @@ def get_cpp11_stdspec():
 
     stdspec = None
     for stdspec_ in ['-std=c++11', '-std=c++0x', '-std=c++', '']:
-        print("-- Trying compiler argument '%s' to enable C++11 support" % (stdspec_))
+        distutils.log.debug("-- Trying compiler argument '%s' to enable C++11 support", stdspec_)
         extra_postargs=[stdspec_] if stdspec_ else []
         if compiles(source_fname=source_fname, extra_postargs=extra_postargs):
             stdspec = stdspec_
@@ -106,8 +109,19 @@ def get_cpp11_stdspec():
     return stdspec
 
 def has_gsl():
+
+    # Check the headers are actually there
+    code = "#include <gsl/gsl_sf_gamma.h>\nint main() {}"
+    if not compiles(code):
+        distutils.log.error("-- GSL headers not found")
+        return False
+    distutils.log.debug("-- GSL headers found")
+
+    # Check the library can be linked
     with mute_compiler() as c:
-        return c.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
+        has_func = c.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
+    distutils.log.debug("-- GSL library %s", "found" if has_func else "not found")
+    return has_func
 
 def opencl_include():
     return "OpenCL/opencl.h" if sys.platform == "darwin" else "CL/opencl.h"
@@ -124,19 +138,22 @@ def has_opencl():
         int main() {}
         """ % (opencl_include())
     if not compiles(code):
-        print("OpenCL headers not found")
+        distutils.log.info("-- OpenCL headers not found")
         return False
+    distutils.log.debug("-- OpenCL headers found")
 
     # Check the library can be linked
     with mute_compiler() as c:
-        return c.has_function('clCreateContext', libraries=['OpenCL'])
+        has_func = c.has_function('clCreateContext', libraries=['OpenCL'])
+    distutils.log.debug("-- OpenCL library %s", "found" if has_func else "not found")
+    return has_func
 
 def max_opencl_ver():
 
     inc = opencl_include()
     for ver in ((2,0), (1,2), (1,1), (1,0)):
         maj,min = ver
-        print("-- Looking for OpenCL %d.%d" % (maj, min))
+        distutils.log.debug("-- Looking for OpenCL %d.%d", maj, min)
 
         code = """
         #include <iostream>
@@ -167,17 +184,19 @@ class configure(setuptools.Command):
         # Find (if any) the C++11 flag required to compile our code
         stdspec = get_cpp11_stdspec()
         if stdspec is None:
-            print("\n\nNo C/C++ compiler with C++11 support found."
-                  "Use the CC environment variable to specify a different compiler if you have one.\n"
-                  "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches "
-                  "(e.g., PYPROFIT_CXX11='-std c++11')")
-            sys.exit(1)
-        print("-- Using '%s' to enable C++11 support" % (stdspec,))
+            msg = "\n\nNo C/C++ compiler with C++11 support found." + \
+                  "Use the CC environment variable to specify a different compiler if you have one.\n" + \
+                  "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches " + \
+                  "(e.g., PYPROFIT_CXX11='-std c++11')"
+            raise distutils.errors.DistutilsPlatformError(msg)
+        distutils.log.info("-- Using '%s' to enable C++11 support", stdspec)
 
         # Scan for GSL
         if not has_gsl():
-            print("\n\n-- No GSL installation found on your system. Install the GSL development package and try again\n\n")
-            sys.exit(1)
+            msg = "No GSL installation found on your system. " + \
+                  "Install the GSL development package and try again\n\n"
+            raise distutils.errors.DistutilsPlatformError(msg)
+        distutils.log.info("-- Found GSL headers/lib")
 
         libs = ['gsl', 'gslcblas']
         defines = [('PROFIT_BUILD', 1), ('HAVE_GSL',1)]
@@ -186,13 +205,13 @@ class configure(setuptools.Command):
         # Optional OpenCL support
         if has_opencl():
             maj,min = max_opencl_ver()
-            print("-- Compiling pyprofit with OpenCL %d.%d support" % (maj, min))
+            distutils.log.info("-- Compiling pyprofit with OpenCL %d.%d support", maj, min)
             libs.append('OpenCL')
             defines.append(('PROFIT_OPENCL',1))
             defines.append(('PROFIT_OPENCL_MAJOR', maj))
             defines.append(('PROFIT_OPENCL_MINOR', min))
         else:
-            print("-- Compiling pyprofit without OpenCL support")
+            distutils.log.info("-- Compiling pyprofit without OpenCL support")
 
         pyprofit_ext.libraries = libs
         pyprofit_ext.define_macros = defines
