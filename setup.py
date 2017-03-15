@@ -33,6 +33,15 @@ import setuptools
 from setuptools.command.build_ext import build_ext
 
 
+def enrich_with_ldflags(compiler):
+    if os.name != 'posix':
+        return
+    if 'LDFLAGS' not in os.environ or not os.environ['LDFLAGS']:
+        return
+    dirs = filter(lambda x: x.strip(), os.environ['LDFLAGS'].split('-L'))
+    for d in dirs:
+        compiler.add_library_dir(d)
+
 class mute_compiler(object):
 
     def __init__(self):
@@ -119,6 +128,7 @@ def has_gsl():
 
     # Check the library can be linked
     with mute_compiler() as c:
+        enrich_with_ldflags(c)
         has_func = c.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
     distutils.log.debug("-- GSL library %s", "found" if has_func else "not found")
     return has_func
@@ -144,6 +154,7 @@ def has_opencl():
 
     # Check the library can be linked
     with mute_compiler() as c:
+        enrich_with_ldflags(c)
         has_func = c.has_function('clCreateContext', libraries=['OpenCL'])
     distutils.log.debug("-- OpenCL library %s", "found" if has_func else "not found")
     return has_func
