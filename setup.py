@@ -39,7 +39,7 @@ class mute_compiler(object):
         self.devnull = self.oldstderr = None
 
     def __enter__(self):
-        if os.name == 'posix':
+        if 'PYPROFIT_NO_MUTE' not in os.environ and os.name == 'posix':
             self.devnull = open(os.devnull, 'w')
             self.oldstderr = os.dup(sys.stderr.fileno())
             self.oldstdout = os.dup(sys.stdout.fileno())
