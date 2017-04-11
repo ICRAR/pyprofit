@@ -177,6 +177,29 @@ def max_opencl_ver():
         if compiles(code):
             return maj,min
 
+def has_openmp():
+
+    code = """
+    #include <omp.h>
+    int main() {
+    #ifdef _OPENMP
+      return 0;
+    #else
+      breaks_on_purpose
+    #endif
+    }
+    """
+
+    # This should cover most compilers; otherwise we can always add more...
+    for flag in ("", "-fopenmp", "-fopenmp=libomp", "-openmp", "-xopenmp", "-mp"):
+        distutils.log.debug("-- Trying OpenMP support with %s", flag)
+        if compiles(code, extra_postargs=[flag]):
+            distutils.log.info("-- OpenMP support available via %s", flag)
+            return flag
+
+    distutils.log.info("-- No OpenMP support available", flag)
+    return None
+
 class configure(setuptools.Command):
     """Configure command to enrich the pyprofit extension"""
 
@@ -212,6 +235,7 @@ class configure(setuptools.Command):
         libs = ['gsl', 'gslcblas']
         defines = [('PROFIT_BUILD', 1), ('HAVE_GSL',1)]
         extra_compile_args=[stdspec] if stdspec else []
+        extra_link_args = []
 
         # Optional OpenCL support
         if has_opencl():
@@ -224,9 +248,17 @@ class configure(setuptools.Command):
         else:
             distutils.log.info("-- Compiling pyprofit without OpenCL support")
 
+        # Optional OpenMP support
+        openmp_flag = has_openmp()
+        if openmp_flag is not None:
+            defines.append(('PROFIT_OPENMP', 1))
+            extra_compile_args.append(openmp_flag)
+            extra_link_args.append(openmp_flag)
+
         pyprofit_ext.libraries = libs
         pyprofit_ext.define_macros = defines
         pyprofit_ext.extra_compile_args = extra_compile_args
+        pyprofit_ext.extra_link_args = extra_link_args
 
 class _build_ext(build_ext):
     """Custom build_ext command that includes the configure command"""

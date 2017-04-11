@@ -515,6 +515,14 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	}
 #endif /* PROFIT_OPENCL */
 
+#ifdef PROFIT_OPENMP
+	/* Assign requested number of OpenMP threads */
+	PyObject *p_omp_threads = PyDict_GetItemString(model_dict, "omp_threads");
+	if( p_omp_threads != NULL ) {
+		m.omp_threads = (unsigned int)PyInt_AsUnsignedLongMask(p_omp_threads);
+	}
+#endif /* PROFIT_OPENMP */
+
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
 	_read_moffat_profiles(m, profiles_dict);
