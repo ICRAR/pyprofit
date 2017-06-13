@@ -55,7 +55,7 @@ void FFTPlan::finalize()
 FFTPlan::FFTPlan(unsigned int size, effort_t effort, unsigned int omp_threads) :
 	size(0),
 	effort(effort),
-	omp_threads(0),
+	omp_threads(omp_threads),
 	in(), out(),
 	forward_plan(NULL),
 	backward_plan(NULL)

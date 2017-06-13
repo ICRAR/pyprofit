@@ -135,7 +135,7 @@ public:
 	         const std::vector<bool> &mask) override;
 
 private:
-	std::shared_ptr<FFTPlan> plan;
+	std::unique_ptr<FFTPlan> plan;
 
 	std::vector<std::complex<double>> krn_fft;
 
