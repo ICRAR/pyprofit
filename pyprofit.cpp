@@ -127,8 +127,8 @@ static int openclenv_init(OpenclEnv *self, PyObject *args, PyObject *kwargs) {
 	unsigned int plat_idx, dev_idx;
 	PyObject *use_double_o;
 
-	char *kwlist[] = {"plat_idx", "dev_idx", "use_double", NULL};
-	if( !PyArg_ParseTupleAndKeywords(args, kwargs, "IIO", kwlist,
+	const char *kwlist[] = {"plat_idx", "dev_idx", "use_double", NULL};
+	if( !PyArg_ParseTupleAndKeywords(args, kwargs, "IIO", const_cast<char **>(kwlist),
 	                                 &plat_idx, &dev_idx, &use_double_o) ) {
 		return -1;
 	}
@@ -373,17 +373,10 @@ static void _read_sersic_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "sersic", &_item_to_sersic_profile);
 }
 
-static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned int *psf_height) {
+static double *_read_psf(PyObject *matrix, unsigned int *psf_width, unsigned int *psf_height) {
 
 	double *psf = NULL;
 	Py_ssize_t width = 0, height = 0;
-
-	PyObject *matrix = PyDict_GetItemString(model_dict, "psf");
-	if( matrix == NULL ) {
-		*psf_width = 0;
-		*psf_height = 0;
-		return NULL;
-	}
 
 	height = PySequence_Size(matrix);
 	for(Py_ssize_t j = 0; j!=height; j++) {
@@ -425,6 +418,18 @@ static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned
 	return psf;
 }
 
+static double *_read_psf_from_model(PyObject *model_dict, unsigned int *psf_width, unsigned int *psf_height) {
+
+	PyObject *matrix = PyDict_GetItemString(model_dict, "psf");
+	if( matrix == NULL ) {
+		*psf_width = 0;
+		*psf_height = 0;
+		return NULL;
+	}
+
+	return _read_psf(matrix, psf_width, psf_height);
+}
+
 #define READ_DOUBLE(from, name, to) \
 	do { \
 		PyObject *_val = PyDict_GetItemString(from, name); \
@@ -435,6 +440,129 @@ static double *_read_psf(PyObject *model_dict, unsigned int *psf_width, unsigned
 			} \
 		} \
 	} while(0);
+
+
+/*
+ * Convolver object structure
+ */
+typedef struct {
+    PyObject_HEAD
+    std::shared_ptr<Convolver> convolver;
+} ConvolverPtr;
+
+
+/*
+ * destructor
+ */
+static void convolverptr_dealloc(ConvolverPtr *self) {
+	self->convolver.reset();
+	Py_TYPE(self)->tp_free((PyObject*)self);
+}
+
+/*
+ * ConvolverPtr object type
+ */
+static PyTypeObject ConvolverPtr_Type = {
+#if PY_MAJOR_VERSION >= 3
+	PyVarObject_HEAD_INIT(NULL, 0)
+#else
+	PyObject_HEAD_INIT(NULL)
+	0,                             /*ob_size*/
+#endif
+	"pyprofit.convolver",          /*tp_name*/
+	sizeof(ConvolverPtr),          /*tp_basicsize*/
+};
+
+static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObject *kwargs) {
+
+	unsigned int psf_width = 0, psf_height = 0, width, height;
+	PyObject *psf_p;
+	double *psf;
+
+#ifdef PROFIT_OPENMP
+	unsigned int omp_threads = 1;
+#endif /* PROFIT_OPENMP */
+#ifdef PROFIT_FFTW
+	PyObject *use_fft = Py_False;
+	PyObject *reuse_psf_fft = Py_False;
+	unsigned int fft_effort = 0;
+#endif /* PROFIT_FFTW */
+
+	const char * fmt = "IIO|"
+#ifdef PROFIT_OPENMP
+	"I"
+#endif /* PROFIT_OPENMP */
+#ifdef PROFIT_FFTW
+	"OOI"
+#endif /* PROFIT_FFTW */
+	":make_convolver";
+
+	const char *kwlist[] = {"width", "height", "psf",
+#ifdef PROFIT_OPENMP
+		"omp_threads",
+#endif /* PROFIT_OPENMP */
+#ifdef PROFIT_FFTW
+		"use_fft", "reuse_psf_fft", "fft_effort",
+#endif /* PROFIT_FFTW */
+		NULL};
+
+	int res = PyArg_ParseTupleAndKeywords(args, kwargs, fmt, const_cast<char **>(kwlist),
+	                                      &width, &height, &psf_p
+#ifdef PROFIT_OPENMP
+	                                      ,&omp_threads
+#endif /* PROFIT_OPENMP */
+#ifdef PROFIT_FFTW
+	                                      ,&use_fft, &reuse_psf_fft, &fft_effort
+#endif /* PROFIT_FFTW */
+	          );
+
+	if (!res) {
+		return NULL;
+	}
+
+	/* The width, height and profiles are mandatory */
+	psf = _read_psf(psf_p, &psf_width, &psf_height);
+	if( PyErr_Occurred() ) {
+		return NULL;
+	}
+
+	Model m;
+	m.width = width;
+	m.height = height;
+	m.psf = std::vector<double>(psf, psf + (psf_width * psf_height));
+	m.psf_width = psf_width;
+	m.psf_height = psf_height;
+
+#ifdef PROFIT_OPENMP
+	m.omp_threads = omp_threads;
+#endif /* PROFIT_OPENMP */
+#ifdef PROFIT_FFTW
+	m.use_fft = static_cast<bool>(PyObject_IsTrue(use_fft));
+	m.reuse_psf_fft = static_cast<bool>(PyObject_IsTrue(reuse_psf_fft));
+	m.fft_effort = FFTPlan::effort_t(fft_effort);
+#endif /* PROFIT_FFTW */
+
+	PyObject *convolver_ptr = PyObject_CallObject((PyObject *)&ConvolverPtr_Type, NULL);
+	if (!convolver_ptr) {
+		PYPROFIT_RAISE("Couldn't allocate memory for new convolver");
+	}
+
+	std::string error;
+	Py_BEGIN_ALLOW_THREADS
+	try {
+		((ConvolverPtr *)convolver_ptr)->convolver = m.create_convolver();
+	} catch (std::exception &e) {
+		// can't PyErr_SetString directly here because we don't have the GIL
+		error = e.what();
+	}
+	Py_END_ALLOW_THREADS
+
+	if (!error.empty()) {
+		PYPROFIT_RAISE(error.c_str());
+	}
+
+	return convolver_ptr;
+}
 
 static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
@@ -471,7 +599,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	}
 
 	/* Read the psf if present */
-	psf = _read_psf(model_dict, &psf_width, &psf_height);
+	psf = _read_psf_from_model(model_dict, &psf_width, &psf_height);
 	if( PyErr_Occurred() ) {
 		return NULL;
 	}
@@ -522,6 +650,11 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 		m.omp_threads = (unsigned int)PyInt_AsUnsignedLongMask(p_omp_threads);
 	}
 #endif /* PROFIT_OPENMP */
+
+	PyObject *convolver = PyDict_GetItemString(model_dict, "convolver");
+	if (convolver) {
+		m.convolver = ((ConvolverPtr *)convolver)->convolver;
+	}
 
 	/* Read the profiles */
 	_read_sersic_profiles(m, profiles_dict);
@@ -579,8 +712,9 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
  * Methods in the pyprofit module
  */
 static PyMethodDef pyprofit_methods[] = {
-    {"make_model",  pyprofit_make_model,  METH_VARARGS, "Creates a profit model."},
-    {"opencl_info", pyprofit_opencl_info, METH_NOARGS,  "Gets OpenCL environment information."},
+    {"make_model",     pyprofit_make_model,     METH_VARARGS, "Creates a profit model."},
+    {"make_convolver", (PyCFunction)pyprofit_make_convolver, METH_VARARGS | METH_KEYWORDS, "Creates a reusable convolver."},
+    {"opencl_info",    pyprofit_opencl_info,    METH_NOARGS,  "Gets OpenCL environment information."},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
@@ -621,6 +755,16 @@ MOD_INIT(pyprofit)
 		return MOD_VAL(NULL);
 	}
 
+	ConvolverPtr_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+	ConvolverPtr_Type.tp_doc = "A model convolver";
+	ConvolverPtr_Type.tp_new = PyType_GenericNew;
+	ConvolverPtr_Type.tp_dealloc = (destructor)convolverptr_dealloc;
+	ConvolverPtr_Type.tp_init = (initproc)NULL;
+	if( PyType_Ready(&ConvolverPtr_Type) < 0 ) {
+		return MOD_VAL(NULL);
+	}
+	Py_INCREF(&ConvolverPtr_Type);
+
 #ifdef PROFIT_OPENCL
 	OpenclEnv_Type.tp_flags = Py_TPFLAGS_DEFAULT;
 	OpenclEnv_Type.tp_doc = "An OpenCL environment";
@@ -634,6 +778,13 @@ MOD_INIT(pyprofit)
 	PyModule_AddObject(m, "openclenv", (PyObject *)&OpenclEnv_Type);
 #endif /* PROFIT_OPENCL */
 
+#ifdef PROFIT_FFTW
+	try {
+		FFTPlan::initialize();
+	} catch (const std::exception &e) {
+		return MOD_VAL(m);
+	}
+#endif /* PROFIT_FFTW */
 	return MOD_VAL(m);
 }
 

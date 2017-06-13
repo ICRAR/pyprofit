@@ -26,6 +26,7 @@
 #ifndef PROFIT_MOFFAT_H
 #define PROFIT_MOFFAT_H
 
+#include "profit/config.h"
 #include "profit/radial.h"
 
 namespace profit
@@ -101,6 +102,9 @@ protected:
 	 */
 	double con;
 	// @}
+
+private:
+  double fluxfrac(double fraction) const;
 
 #ifdef PROFIT_OPENCL
 

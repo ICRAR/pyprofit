@@ -25,6 +25,7 @@ from distutils.dep_util import newer_group
 import distutils.errors
 import glob
 import os
+import subprocess
 import sys
 import tempfile
 
@@ -179,6 +180,10 @@ def max_opencl_ver():
 
 def has_openmp():
 
+    # User doesn't want OpenMP support
+    if 'PYPROFIT_NO_OPENMP' in os.environ:
+        return None
+
     code = """
     #include <omp.h>
     int main() {
@@ -197,8 +202,36 @@ def has_openmp():
             distutils.log.info("-- OpenMP support available via %s", flag)
             return flag
 
-    distutils.log.info("-- No OpenMP support available", flag)
     return None
+
+def has_fftw():
+
+    # User doesn't want FFTW support
+    if 'PYPROFIT_NO_FFTW' in os.environ:
+        return False
+
+    # Check the headers are actually there
+    code = "#include <fftw3.h>\nint main() {}"
+    if not compiles(code):
+        distutils.log.error("-- FFTW headers not found")
+        return False
+    distutils.log.debug("-- FFTW headers found")
+
+    # Check the library can be linked
+    with mute_compiler() as c:
+        enrich_with_ldflags(c)
+        has_func = c.has_function('fftw_cleanup', libraries=['fftw3'])
+    distutils.log.debug("-- FFTW library %s", "found" if has_func else "not found")
+    return has_func
+
+def has_fftw_omp(openmp_flag):
+
+    # Check the library can be linked
+    with mute_compiler() as c:
+        enrich_with_ldflags(c)
+        has_func = c.has_function('fftw_plan_with_nthreads', libraries=['fftw3', 'fftw3_omp'])
+    distutils.log.debug("-- FFTW OpenMP library %s", "found" if has_func else "not found")
+    return has_func
 
 class configure(setuptools.Command):
     """Configure command to enrich the pyprofit extension"""
@@ -208,6 +241,43 @@ class configure(setuptools.Command):
     finalize_options = initialize_options
     description = 'Configures the pyprofit extension'
     user_options = []
+
+    def _generate_config_h(self, defs):
+
+        distutils.log.info("-- Generating config.h")
+
+        this_dir = os.path.dirname(__file__)
+        version_file = os.path.join(this_dir, 'libprofit', 'VERSION')
+        config_in_file = os.path.join(this_dir, 'libprofit', 'profit', 'config.h.in')
+        config_h_file = os.path.join(this_dir, 'libprofit', 'profit', 'config.h')
+
+        with open(version_file, 'rt') as f:
+            version = f.read().strip()
+
+        # The following items need to be replaced:
+        #  * #cmakedefine PROFIT_{USES_{R,GSL},DEBUG,OPENMP,OPENCL,FFTW{,_OPENMP}}
+        #  * #define PROFIT_VERSION "@PROFIT_VERSION@"
+        #  * #define PROFIT_OPENCL_MAJOR @PROFIT_OPENCL_MAJOR@
+        #  * #define PROFIT_OPENCL_MINOR @PROFIT_OPENCL_MINOR@
+        cmakedefines = [('PROFIT_USES_R', False),
+                        ('PROFIT_USES_GSL', True),
+                        ('PROFIT_DEBUG', False)]
+        for macro in ('PROFIT_OPENMP', 'PROFIT_OPENCL', 'PROFIT_FFTW', 'PROFIT_FFTW_OPENMP'):
+            cmakedefines.append((macro, macro in defs))
+
+        defines = [('PROFIT_VERSION', version),
+                   ('PROFIT_OPENCL_MAJOR', defs.get('PROFIT_OPENCL_MAJOR', '')),
+                   ('PROFIT_OPENCL_MINOR', defs.get('PROFIT_OPENCL_MINOR', ''))]
+
+        replacements = []
+        for k, v in defines:
+            replacements.append('s/@%s@/%s/' % (k, v))
+        for k, v in cmakedefines:
+            replacements.append('s/^#cmakedefine %s/#%s %s/' % (k, 'define' if v else 'undef', k))
+        replacements = '; '.join(replacements)
+
+        with open(config_h_file, 'wb') as f:
+            f.write(subprocess.check_output(['sed', replacements, config_in_file]))
 
     def run(self):
 
@@ -233,7 +303,7 @@ class configure(setuptools.Command):
         distutils.log.info("-- Found GSL headers/lib")
 
         libs = ['gsl', 'gslcblas']
-        defines = [('PROFIT_BUILD', 1), ('HAVE_GSL',1)]
+        defines = {'HAVE_GSL': 1}
         extra_compile_args=[stdspec] if stdspec else []
         extra_link_args = []
 
@@ -242,21 +312,38 @@ class configure(setuptools.Command):
             maj,min = max_opencl_ver()
             distutils.log.info("-- Compiling pyprofit with OpenCL %d.%d support", maj, min)
             libs.append('OpenCL')
-            defines.append(('PROFIT_OPENCL',1))
-            defines.append(('PROFIT_OPENCL_MAJOR', maj))
-            defines.append(('PROFIT_OPENCL_MINOR', min))
+            defines['PROFIT_OPENCL'] = 1
+            defines['PROFIT_OPENCL_MAJOR'] = maj
+            defines['PROFIT_OPENCL_MINOR'] = min
         else:
             distutils.log.info("-- Compiling pyprofit without OpenCL support")
 
         # Optional OpenMP support
         openmp_flag = has_openmp()
         if openmp_flag is not None:
-            defines.append(('PROFIT_OPENMP', 1))
+            defines['PROFIT_OPENMP'] = 1
             extra_compile_args.append(openmp_flag)
             extra_link_args.append(openmp_flag)
+        else:
+            distutils.log.info("-- No OpenMP support available")
+
+        # Optional FFTW support
+        if has_fftw():
+            defines['PROFIT_FFTW'] = 1
+            libs.append('fftw3')
+            if openmp_flag and has_fftw_omp(openmp_flag):
+                defines['PROFIT_FFTW_OPENMP'] = 1
+                libs.append('fftw3_omp')
+                distutils.log.info("-- Compiling pyprofit with OpenMP-enabled FFTW support")
+            else:
+                distutils.log.info("-- Compiling pyprofit with FFTW support")
+        else:
+            distutils.log.info("-- Compiling pyprofit without FFTW support")
+
+        self._generate_config_h(defines)
 
         pyprofit_ext.libraries = libs
-        pyprofit_ext.define_macros = defines
+        pyprofit_ext.define_macros = [('PROFIT_BUILD', 1)]
         pyprofit_ext.extra_compile_args = extra_compile_args
         pyprofit_ext.extra_link_args = extra_link_args
 
@@ -289,7 +376,7 @@ pyprofit_ext = Extension('pyprofit',
 
 setup(
       name='pyprofit',
-      version='1.3.0',
+      version='1.4.0',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
@@ -304,6 +391,7 @@ setup(
           "Programming Language :: Python :: 3.3",
           "Programming Language :: Python :: 3.4",
           "Programming Language :: Python :: 3.5",
+          "Programming Language :: Python :: 3.6",
           "Topic :: Scientific/Engineering :: Astronomy"
       ],
       ext_modules = [pyprofit_ext],

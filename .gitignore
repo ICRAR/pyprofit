@@ -7,3 +7,4 @@ build
 tmp
 a.out
 *.pyc
+libprofit/profit/config.h
