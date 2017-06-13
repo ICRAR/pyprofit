@@ -1,2 +1,3 @@
 graft libprofit/profit
 graft libprofit/src/cl
+include libprofit/VERSION
