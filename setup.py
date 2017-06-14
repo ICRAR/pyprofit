@@ -276,8 +276,14 @@ class configure(setuptools.Command):
             replacements.append('s/^#cmakedefine %s/#%s %s/' % (k, 'define' if v else 'undef', k))
         replacements = '; '.join(replacements)
 
+        cmd = ['sed', replacements, config_in_file]
         with open(config_h_file, 'wb') as f:
-            f.write(subprocess.check_output(['sed', replacements, config_in_file]))
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
+            output, _ = p.communicate()
+            retcode = p.poll()
+            if retcode:
+                raise Exception("Error while running %s: %s" % (cmd, output))
+            f.write(output)
 
     def run(self):
 
