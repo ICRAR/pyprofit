@@ -16,25 +16,26 @@ addons:
 
 # Install libprofit before trying to install pyprofit
 before_install:
- - cd ${TRAVIS_BUILD_DIR}
+ - export LIBPROFIT_HOME=${HOME}/libprofit_installation
+ - cd ${HOME}
  - curl -O https://cmake.org/files/v3.1/cmake-3.1.3-Linux-x86_64.tar.gz
  - tar -xf cmake-3.1.3-Linux-x86_64.tar.gz
- - export PATH=${TRAVIS_BUILD_DIR}/cmake-3.1.3-Linux-x86_64/bin:$PATH
- - export CMAKE_MODULE_PATH=${TRAVIS_BUILD_DIR}/cmake-3.1.3-Linux-x86_64/share/cmake-3.1/Modules:${CMAKE_MODULE_PATH}
+ - export PATH=${HOME}/cmake-3.1.3-Linux-x86_64/bin:$PATH
+ - export CMAKE_MODULE_PATH=${HOME}/cmake-3.1.3-Linux-x86_64/share/cmake-3.1/Modules:${CMAKE_MODULE_PATH}
  - sudo apt-get install libgsl0-dev opencl-headers
  - git clone https://github.com/ICRAR/libprofit
  - cd libprofit
  - git checkout v1.4.1
  - mkdir build
  - cd build
- - cmake .. -DCMAKE_CXX_FLAGS="-std=c++0x" -DCMAKE_INSTALL_PREFIX=${TRAVIS_BUILD_DIR}/libprofit_installation
+ - cmake .. -DCMAKE_CXX_FLAGS="-std=c++0x" -DCMAKE_INSTALL_PREFIX=${LIBPROFIT_HOME}
  - make all install
 
 # Run the build and make sure we can at least import pyprofit correctly
 script:
  - cd ${TRAVIS_BUILD_DIR}
- - LIBPROFIT_HOME=${TRAVIS_BUILD_DIR}/libprofit_installation python setup.py install
- - "python -c \"import pyprofit; width=500; height=500; sp = {'xcen': width/2, 'ycen': height/2, 'mag': 15, 'ang': 0, 'box': 0.4, 'axrat': 0.3, 'nser': 4, 're': width/4}; model = {'width': width, 'height': height, 'profiles': {'sersic': [sp]}}; pyprofit.make_model(model)\""
+ - python setup.py install
+ - LD_LIBRARY_PATH=${LIBPROFIT_HOME}/lib "python -c \"import pyprofit; width=500; height=500; sp = {'xcen': width/2, 'ycen': height/2, 'mag': 15, 'ang': 0, 'box': 0.4, 'axrat': 0.3, 'nser': 4, 're': width/4}; model = {'width': width, 'height': height, 'profiles': {'sersic': [sp]}}; pyprofit.make_model(model)\""
 
 # safelist
 branches:
