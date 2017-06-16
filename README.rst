@@ -11,6 +11,8 @@ pyprofit
     :target: https://pypi.python.org/pypi/pyprofit
 
 *pyprofit* is a python wrapper for `libprofit <https://www.github.com/ICRAR/libprofit>`_.
+As such, you need to have *libprofit* installed in your system to install
+*pyprofit*.
 
 *pyprofit* is available in `PyPI <https://pypi.python.org/pypi/pyprofit>`_
 and thus can be easily installed via::

@@ -25,6 +25,7 @@ from distutils.dep_util import newer_group
 import distutils.errors
 import glob
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -34,14 +35,11 @@ import setuptools
 from setuptools.command.build_ext import build_ext
 
 
-def enrich_with_ldflags(compiler):
-    if os.name != 'posix':
-        return
-    if 'LDFLAGS' not in os.environ or not os.environ['LDFLAGS']:
-        return
-    dirs = filter(lambda x: x.strip(), os.environ['LDFLAGS'].split('-L'))
-    for d in dirs:
-        compiler.add_library_dir(d)
+#
+# Versions of libprofit against which this extension works
+# None signifies an open limit
+#
+libprofit_versions = ((1, 4),)
 
 class mute_compiler(object):
 
@@ -118,120 +116,69 @@ def get_cpp11_stdspec():
     os.remove(source_fname)
     return stdspec
 
-def has_gsl():
 
-    # Check the headers are actually there
-    code = "#include <gsl/gsl_sf_gamma.h>\nint main() {}"
-    if not compiles(code):
-        distutils.log.error("-- GSL headers not found")
-        return False
-    distutils.log.debug("-- GSL headers found")
-
-    # Check the library can be linked
-    with mute_compiler() as c:
-        enrich_with_ldflags(c)
-        has_func = c.has_function('gsl_sf_gamma', libraries=['gsl', 'gslcblas'])
-    distutils.log.debug("-- GSL library %s", "found" if has_func else "not found")
-    return has_func
-
-def opencl_include():
-    return "OpenCL/opencl.h" if sys.platform == "darwin" else "CL/opencl.h"
-
-def has_opencl():
-
-    # User doesn't want OpenCL support
-    if 'PYPROFIT_NO_OPENCL' in os.environ:
-        return False
-
-    # Check the headers are actually there
-    code = """
-        #include <%s>
-        int main() {}
-        """ % (opencl_include())
-    if not compiles(code):
-        distutils.log.info("-- OpenCL headers not found")
-        return False
-    distutils.log.debug("-- OpenCL headers found")
-
-    # Check the library can be linked
-    with mute_compiler() as c:
-        enrich_with_ldflags(c)
-        has_func = c.has_function('clCreateContext', libraries=['OpenCL'])
-    distutils.log.debug("-- OpenCL library %s", "found" if has_func else "not found")
-    return has_func
-
-def max_opencl_ver():
-
-    inc = opencl_include()
-    for ver in ((2,0), (1,2), (1,1), (1,0)):
-        maj,min = ver
-        distutils.log.debug("-- Looking for OpenCL %d.%d", maj, min)
-
-        code = """
-        #include <iostream>
-        #include <%s>
-
-        int main() {
-            std::cout << CL_VERSION_%d_%d << std::endl;
-        }
-        """ % (inc, maj, min)
-        if compiles(code):
-            return maj,min
-
-def has_openmp():
-
-    # User doesn't want OpenMP support
-    if 'PYPROFIT_NO_OPENMP' in os.environ:
-        return None
-
-    code = """
-    #include <omp.h>
-    int main() {
-    #ifdef _OPENMP
-      return 0;
-    #else
-      breaks_on_purpose
-    #endif
-    }
-    """
-
-    # This should cover most compilers; otherwise we can always add more...
-    for flag in ("", "-fopenmp", "-fopenmp=libomp", "-openmp", "-xopenmp", "-mp"):
-        distutils.log.debug("-- Trying OpenMP support with %s", flag)
-        if compiles(code, extra_postargs=[flag]):
-            distutils.log.info("-- OpenMP support available via %s", flag)
-            return flag
-
+def check_libprofit_version(h):
+    with open(h, 'rt') as h:
+        h = h.read()
+        m = re.search(r'#define\WPROFIT_VERSION\W"(\d\.\d\.\d)"', h)
+        if m:
+            return tuple(map(int, m.group(1).split('.')))
     return None
 
-def has_fftw():
+def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
 
-    # User doesn't want FFTW support
-    if 'PYPROFIT_NO_FFTW' in os.environ:
-        return False
-
-    # Check the headers are actually there
-    code = "#include <fftw3.h>\nint main() {}"
-    if not compiles(code):
-        distutils.log.error("-- FFTW headers not found")
-        return False
-    distutils.log.debug("-- FFTW headers found")
-
-    # Check the library can be linked
+    # Manually check the headers are actually there, and that the version is
+    # one we support
     with mute_compiler() as c:
-        enrich_with_ldflags(c)
-        has_func = c.has_function('fftw_cleanup', libraries=['fftw3'])
-    distutils.log.debug("-- FFTW library %s", "found" if has_func else "not found")
-    return has_func
+        compiler_incdirs = c.include_dirs
 
-def has_fftw_omp(openmp_flag):
+    incdir = None
+    for i in compiler_incdirs + user_incdirs:
+        header = os.path.join(i, 'profit', 'config.h')
+        if not os.path.exists(header):
+            continue
+        distutils.log.debug("-- Found libprofit headers in %s, checking version" % header)
+        version = check_libprofit_version(header)
+        ver_str = '.'.join(map(str, version))
+        distutils.log.debug("-- Found libprofit version %s in %s" % (ver_str, header))
+        if version[:2] in libprofit_versions:
+            distutils.log.info("-- Found libprofit headers for version %s", ver_str)
+            incdir = i
+            break
 
-    # Check the library can be linked
+    if not incdir:
+        distutils.log.error("-- no suitable libprofit headers not found")
+        return None
+
+    source_fname = tempfile.mktemp(suffix='.cpp')
+    with open(source_fname, 'w') as f:
+        f.write('int main() {}')
+
+    # Check the library can be linked (and against which library dir)
+    libdir = None
     with mute_compiler() as c:
-        enrich_with_ldflags(c)
-        has_func = c.has_function('fftw_plan_with_nthreads', libraries=['fftw3', 'fftw3_omp'])
-    distutils.log.debug("-- FFTW OpenMP library %s", "found" if has_func else "not found")
-    return has_func
+        c.add_include_dir(incdir)
+        c.add_library('profit')
+
+        try:
+            object_fnames = c.compile([source_fname], extra_preargs=extra_compile_args)
+        except:
+            return False
+
+        for l in c.library_dirs + user_libdirs:
+            try:
+                c.link_executable(object_fnames, 'test', library_dirs=[l])
+                distutils.log.info("-- Found libprofit version in %s" % l)
+                libdir = l
+                break
+            except:
+                pass
+
+    if not libdir:
+        distutils.log.error("-- libprofit library not found")
+        return None
+
+    return incdir, libdir
 
 class configure(setuptools.Command):
     """Configure command to enrich the pyprofit extension"""
@@ -242,50 +189,25 @@ class configure(setuptools.Command):
     description = 'Configures the pyprofit extension'
     user_options = []
 
-    def _generate_config_h(self, defs):
-
-        distutils.log.info("-- Generating config.h")
-
-        this_dir = os.path.dirname(__file__)
-        version_file = os.path.join(this_dir, 'libprofit', 'VERSION')
-        config_in_file = os.path.join(this_dir, 'libprofit', 'profit', 'config.h.in')
-        config_h_file = os.path.join(this_dir, 'libprofit', 'profit', 'config.h')
-
-        with open(version_file, 'rt') as f:
-            version = f.read().strip()
-
-        # The following items need to be replaced:
-        #  * #cmakedefine PROFIT_{USES_{R,GSL},DEBUG,OPENMP,OPENCL,FFTW{,_OPENMP}}
-        #  * #define PROFIT_VERSION "@PROFIT_VERSION@"
-        #  * #define PROFIT_OPENCL_MAJOR @PROFIT_OPENCL_MAJOR@
-        #  * #define PROFIT_OPENCL_MINOR @PROFIT_OPENCL_MINOR@
-        cmakedefines = [('PROFIT_USES_R', False),
-                        ('PROFIT_USES_GSL', True),
-                        ('PROFIT_DEBUG', False)]
-        for macro in ('PROFIT_OPENMP', 'PROFIT_OPENCL', 'PROFIT_FFTW', 'PROFIT_FFTW_OPENMP'):
-            cmakedefines.append((macro, macro in defs))
-
-        defines = [('PROFIT_VERSION', version),
-                   ('PROFIT_OPENCL_MAJOR', defs.get('PROFIT_OPENCL_MAJOR', '')),
-                   ('PROFIT_OPENCL_MINOR', defs.get('PROFIT_OPENCL_MINOR', ''))]
-
-        replacements = []
-        for k, v in defines:
-            replacements.append('s/@%s@/%s/' % (k, v))
-        for k, v in cmakedefines:
-            replacements.append('s/^#cmakedefine %s/#%s %s/' % (k, 'define' if v else 'undef', k))
-        replacements = '; '.join(replacements)
-
-        cmd = ['sed', replacements, config_in_file]
-        with open(config_h_file, 'wb') as f:
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=False)
-            output, _ = p.communicate()
-            retcode = p.poll()
-            if retcode:
-                raise Exception("Error while running %s: %s" % (cmd, output))
-            f.write(output)
-
     def run(self):
+
+        LIBPROFIT_HOME   = os.environ.get('LIBPROFIT_HOME', None)
+        LIBPROFIT_INCDIR = os.environ.get('LIBPROFIT_INCDIR', None)
+        LIBPROFIT_LIBDIR = os.environ.get('LIBPROFIT_LIBDIR', None)
+
+        user_incdirs = []
+        user_libdirs = []
+        if LIBPROFIT_HOME:
+            LIBPROFIT_HOME = os.path.expanduser(LIBPROFIT_HOME)
+            user_incdirs.append(os.path.join(LIBPROFIT_HOME, 'include'))
+            user_libdirs.append(os.path.join(LIBPROFIT_HOME, 'lib'))
+            user_libdirs.append(os.path.join(LIBPROFIT_HOME, 'lib64'))
+        if LIBPROFIT_INCDIR:
+            LIBPROFIT_INCDIR = os.path.expanduser(LIBPROFIT_INCDIR)
+            user_incdirs.append(LIBPROFIT_INCDIR)
+        if LIBPROFIT_LIBDIR:
+            LIBPROFIT_LIBDIR = os.path.expanduser(LIBPROFIT_LIBDIR)
+            user_libdirs.append(LIBPROFIT_LIBDIR)
 
         # We should only be configuring the pyprofit module
         assert(len(self.distribution.ext_modules) == 1)
@@ -300,58 +222,26 @@ class configure(setuptools.Command):
                   "(e.g., PYPROFIT_CXX11='-std c++11')"
             raise distutils.errors.DistutilsPlatformError(msg)
         distutils.log.info("-- Using '%s' to enable C++11 support", stdspec)
+        extra_compile_args = [stdspec] if stdspec else []
 
-        # Scan for GSL
-        if not has_gsl():
-            msg = "No GSL installation found on your system. " + \
-                  "Install the GSL development package and try again\n\n"
+        # Scan for libprofit
+        info = has_libprofit(user_incdirs, user_libdirs, extra_compile_args)
+        if not info:
+            msg = ("No libprofit installation found on your system.\n\n"
+                   "You can specify a libprofit installation directory via the LIBPROFIT_HOME "
+                   "environment variable.\n"
+                   "Additionally, you can also use the LIBPROFIT_INCIDR and LIBPROFIT_LIBDIR "
+                   "environment variables\n"
+                   "to point separately to the headers and library directories respectivelly\n\n"
+                   "For example:\n\n"
+                   "LIBPROFIT_HOME=~/local python setup.py install")
             raise distutils.errors.DistutilsPlatformError(msg)
-        distutils.log.info("-- Found GSL headers/lib")
+        distutils.log.info("-- Found libprofit headers/lib")
 
-        libs = ['gsl', 'gslcblas']
-        defines = {'HAVE_GSL': 1}
-        extra_compile_args=[stdspec] if stdspec else []
-        extra_link_args = []
-
-        # Optional OpenCL support
-        if has_opencl():
-            maj,min = max_opencl_ver()
-            distutils.log.info("-- Compiling pyprofit with OpenCL %d.%d support", maj, min)
-            libs.append('OpenCL')
-            defines['PROFIT_OPENCL'] = 1
-            defines['PROFIT_OPENCL_MAJOR'] = maj
-            defines['PROFIT_OPENCL_MINOR'] = min
-        else:
-            distutils.log.info("-- Compiling pyprofit without OpenCL support")
-
-        # Optional OpenMP support
-        openmp_flag = has_openmp()
-        if openmp_flag is not None:
-            defines['PROFIT_OPENMP'] = 1
-            extra_compile_args.append(openmp_flag)
-            extra_link_args.append(openmp_flag)
-        else:
-            distutils.log.info("-- No OpenMP support available")
-
-        # Optional FFTW support
-        if has_fftw():
-            defines['PROFIT_FFTW'] = 1
-            libs.append('fftw3')
-            if openmp_flag and has_fftw_omp(openmp_flag):
-                defines['PROFIT_FFTW_OPENMP'] = 1
-                libs.append('fftw3_omp')
-                distutils.log.info("-- Compiling pyprofit with OpenMP-enabled FFTW support")
-            else:
-                distutils.log.info("-- Compiling pyprofit with FFTW support")
-        else:
-            distutils.log.info("-- Compiling pyprofit without FFTW support")
-
-        self._generate_config_h(defines)
-
-        pyprofit_ext.libraries = libs
-        pyprofit_ext.define_macros = [('PROFIT_BUILD', 1)]
+        pyprofit_ext.libraries = ['profit']
+        pyprofit_ext.include_dirs = [info[0]]
+        pyprofit_ext.library_dirs = [info[1]]
         pyprofit_ext.extra_compile_args = extra_compile_args
-        pyprofit_ext.extra_link_args = extra_link_args
 
 class _build_ext(build_ext):
     """Custom build_ext command that includes the configure command"""
@@ -374,15 +264,11 @@ class _build_ext(build_ext):
 
 # The initial definition of the pyprofit module
 # It is enriched during the 'configure' step
-pyprofit_ext = Extension('pyprofit',
-                       depends=glob.glob('libprofit/profit/*.h') + glob.glob('libprofit/profit/cl/*'),
-                       language='c++',
-                       sources = ['pyprofit.cpp'] + glob.glob('libprofit/src/*.cpp'),
-                       include_dirs = ['libprofit'])
+pyprofit_ext = Extension('pyprofit', language='c++', sources = ['pyprofit.cpp'])
 
 setup(
       name='pyprofit',
-      version='1.4.1',
+      version='1.4.2',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
