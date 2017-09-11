@@ -473,9 +473,33 @@ static PyTypeObject ConvolverPtr_Type = {
 	sizeof(ConvolverPtr),          /*tp_basicsize*/
 };
 
+
+Model::ConvolverType get_convolver_type(const char *conv_type) {
+
+	if (conv_type || strcmp("brute", conv_type) == 0) {
+		return Model::BRUTE;
+	}
+#ifdef PROFIT_OPENCL
+	else if (strcmp("opencl", conv_type) == 0) {
+		return Model::OPENCL;
+	}
+	else if (strcmp("opencl-local", conv_type) == 0) {
+		return Model::OPENCL_LOCAL;
+	}
+#endif // PROFIT_OPENCL
+#ifdef PROFIT_FFTW
+	else if (strcmp("fft", conv_type) == 0) {
+		return Model::FFT;
+	}
+#endif // PROFIT_FFTW
+
+	throw std::exception();
+}
+
 static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 	unsigned int psf_width = 0, psf_height = 0, width, height;
+	const char *convolver_type_name = NULL;
 	PyObject *psf_p;
 	double *psf;
 
@@ -483,37 +507,48 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	unsigned int omp_threads = 1;
 #endif /* PROFIT_OPENMP */
 #ifdef PROFIT_FFTW
-	PyObject *use_fft = Py_False;
 	PyObject *reuse_psf_fft = Py_False;
 	unsigned int fft_effort = 0;
 #endif /* PROFIT_FFTW */
+#ifdef PROFIT_OPENCL
+	PyObject *p_openclenv = NULL;
+#endif /* PROFIT_OPENCL */
 
-	const char * fmt = "IIO|"
+	const char * fmt = "IIOz|"
 #ifdef PROFIT_OPENMP
 	"I"
 #endif /* PROFIT_OPENMP */
 #ifdef PROFIT_FFTW
 	"OOI"
 #endif /* PROFIT_FFTW */
+#ifdef PROFIT_OPENCL
+	"O"
+#endif /* PROFIT_OPENCL */
 	":make_convolver";
 
-	const char *kwlist[] = {"width", "height", "psf",
+	const char *kwlist[] = {"width", "height", "psf", "convolver_type",
 #ifdef PROFIT_OPENMP
 		"omp_threads",
 #endif /* PROFIT_OPENMP */
 #ifdef PROFIT_FFTW
-		"use_fft", "reuse_psf_fft", "fft_effort",
+		"reuse_psf_fft", "fft_effort",
 #endif /* PROFIT_FFTW */
+#ifdef PROFIT_OPENCL
+	    "openclenv",
+#endif /* PROFIT_OPENCL */
 		NULL};
 
 	int res = PyArg_ParseTupleAndKeywords(args, kwargs, fmt, const_cast<char **>(kwlist),
-	                                      &width, &height, &psf_p
+	                                      &width, &height, &psf_p, &convolver_type_name
 #ifdef PROFIT_OPENMP
 	                                      ,&omp_threads
 #endif /* PROFIT_OPENMP */
 #ifdef PROFIT_FFTW
-	                                      ,&use_fft, &reuse_psf_fft, &fft_effort
+	                                      ,&reuse_psf_fft, &fft_effort
 #endif /* PROFIT_FFTW */
+#ifdef PROFIT_OPENCL
+	                                      ,&p_openclenv
+#endif /* PROFIT_OPENCL */
 	          );
 
 	if (!res) {
@@ -533,14 +568,31 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	m.psf_width = psf_width;
 	m.psf_height = psf_height;
 
+	try {
+		m.convolver_type = get_convolver_type(convolver_type_name);
+	} catch (const std::exception &e) {
+		std::ostringstream os;
+		os << "Unknown convolver type: " << convolver_type_name;
+		PYPROFIT_RAISE(os.str().c_str());
+	}
+
 #ifdef PROFIT_OPENMP
 	m.omp_threads = omp_threads;
 #endif /* PROFIT_OPENMP */
 #ifdef PROFIT_FFTW
-	m.use_fft = static_cast<bool>(PyObject_IsTrue(use_fft));
 	m.reuse_psf_fft = static_cast<bool>(PyObject_IsTrue(reuse_psf_fft));
 	m.fft_effort = FFTPlan::effort_t(fft_effort);
 #endif /* PROFIT_FFTW */
+#ifdef PROFIT_OPENCL
+	if( p_openclenv != NULL ) {
+		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
+		if( !openclenv ) {
+			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
+		}
+		m.opencl_env = openclenv->env;
+	}
+#endif /* PROFIT_OPENCL */
+
 
 	PyObject *convolver_ptr = PyObject_CallObject((PyObject *)&ConvolverPtr_Type, NULL);
 	if (!convolver_ptr) {
