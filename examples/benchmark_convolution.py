@@ -33,6 +33,7 @@ parser.add_argument('-n', '--niter', help='Number of iterations, defaults to 100
 
 args = parser.parse_args()
 n_iter = args.niter
+print("Benchmark measuring with %d iterations" % (n_iter,))
 
 # What we use to time iterative executions
 def time_me(**kwargs):
