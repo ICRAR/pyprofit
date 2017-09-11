@@ -476,7 +476,7 @@ static PyTypeObject ConvolverPtr_Type = {
 
 Model::ConvolverType get_convolver_type(const char *conv_type) {
 
-	if (conv_type || strcmp("brute", conv_type) == 0) {
+	if (!conv_type || strcmp("brute", conv_type) == 0) {
 		return Model::BRUTE;
 	}
 #ifdef PROFIT_OPENCL
@@ -514,12 +514,12 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	PyObject *p_openclenv = NULL;
 #endif /* PROFIT_OPENCL */
 
-	const char * fmt = "IIOz|"
+	const char * fmt = "IIO|z"
 #ifdef PROFIT_OPENMP
 	"I"
 #endif /* PROFIT_OPENMP */
 #ifdef PROFIT_FFTW
-	"OOI"
+	"OI"
 #endif /* PROFIT_FFTW */
 #ifdef PROFIT_OPENCL
 	"O"
