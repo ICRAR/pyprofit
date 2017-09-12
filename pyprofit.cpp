@@ -585,10 +585,10 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 #endif /* PROFIT_FFTW */
 #ifdef PROFIT_OPENCL
 	if( p_openclenv != NULL ) {
-		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
-		if( !openclenv ) {
+		if( !PyObject_TypeCheck(p_openclenv, &OpenclEnv_Type) ) {
 			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
 		}
+		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
 		m.opencl_env = openclenv->env;
 	}
 #endif /* PROFIT_OPENCL */
@@ -686,11 +686,11 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 #ifdef PROFIT_OPENCL
 	/* Assign the OpenCL environment to the model */
 	PyObject *p_openclenv = PyDict_GetItemString(model_dict, "openclenv");
-	if( p_openclenv != NULL ) {
-		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
-		if( !openclenv ) {
+	if( p_openclenv != NULL and p_openclenv != Py_None ) {
+		if( !PyObject_TypeCheck(p_openclenv, &OpenclEnv_Type) ) {
 			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
 		}
+		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
 		m.opencl_env = openclenv->env;
 	}
 #endif /* PROFIT_OPENCL */
