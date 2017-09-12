@@ -21,8 +21,10 @@
 #
 
 import argparse
+import collections
 import itertools
 import random
+import sys
 import time
 
 import pyprofit
@@ -36,6 +38,7 @@ n_iter = args.niter
 print("Benchmark measuring with %d iterations" % (n_iter,))
 
 # What we use to time iterative executions
+timing_result = collections.namedtuple('timing_result', 't error')
 def time_me(**kwargs):
     try:
         start = time.time()
@@ -43,9 +46,9 @@ def time_me(**kwargs):
             pyprofit.make_model(kwargs)
         t = time.time() - start
 
-        return t / n_iter
-    except pyprofit.error:
-        return float('nan')
+        return timing_result(t / n_iter, None)
+    except pyprofit.error as e:
+        return timing_result(0, e)
 
 # The profile and image/kernel sizes used throughout the benchmark
 img_sizes= (100, 150, 200, 300, 400, 800)
@@ -74,15 +77,16 @@ for plat, dev, has_double_support in all_cl_devs():
         cl_info[plat][0], cl_info[plat][2][dev][0],
         "Yes" if cl_info[plat][2][dev][1] else "No"))
 print('')
-print('Getting an OpenCL environment for each of them now...')
 
 # Get an float OpenCL environment for each of them
 # If the device supports double, get a double OpenCL environment as well
+sys.stdout.write('Getting an OpenCL environment for each of them now...')
 openclenvs = []
 for p, dev, double_support in all_cl_devs():
     openclenvs.append(pyprofit.openclenv(p, dev, False))
     if double_support:
         openclenvs.append(pyprofit.openclenv(p, dev, True))
+print(' done!')
 
 # Build up the title and display it
 title = "Img Krn    NoConv   Brute    FFT_0    FFT_1"
@@ -90,11 +94,21 @@ for plat, dev, has_double_support in all_cl_devs():
     title += "  cl_{0}{1}_f Lcl_{0}{1}_f".format(plat, dev)
     if has_double_support:
         title += "  cl_{0}{1}_d Lcl_{0}{1}_d".format(plat, dev)
-print('')
-print(title)
+print('\n' + title)
 
+
+def create_convolver(name, **kwargs):
+    if sys.stdout.isatty():
+        sys.stdout.write('Creating %s convolver...' % (name,))
+        sys.stdout.flush()
+    conv = pyprofit.make_convolver(**kwargs)
+    if sys.stdout.isatty():
+        sys.stdout.write('\r\033[K')
+        sys.stdout.flush()
+    return conv
 
 # Main benchmarking process
+errors = []
 for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
 
     # We don't test these
@@ -102,15 +116,15 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
         continue
 
     # Create all required convolvers
-    brute_convolver = pyprofit.make_convolver(width=img_size, height=img_size, psf=krns[krn_size])
-    fft0_convolver = pyprofit.make_convolver(width=img_size, height=img_size, psf=krns[krn_size], convolver_type='fft', fft_effort=0)
-    fft1_convolver = pyprofit.make_convolver(width=img_size, height=img_size, psf=krns[krn_size], convolver_type='fft', fft_effort=1)
+    brute_convolver = create_convolver('brute force', width=img_size, height=img_size, psf=krns[krn_size])
+    fft0_convolver = create_convolver('FFT (effort = 0)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='fft', fft_effort=0)
+    fft1_convolver = create_convolver('FFT (effort = 1)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='fft', fft_effort=1)
 
     # cl_convolvers include normal and local CL convolvers, in the correct order
     cl_convolvers = []
     for clenv in openclenvs:
-        cl_convolvers.append(pyprofit.make_convolver(width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl', openclenv=clenv))
-        cl_convolvers.append(pyprofit.make_convolver(width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl-local', openclenv=clenv))
+        cl_convolvers.append(create_convolver('OpenCL', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl', openclenv=clenv))
+        cl_convolvers.append(create_convolver('OpenCL (local)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl-local', openclenv=clenv))
 
     # Basic profile calculation time
     profiles['sersic'][0]['convolve'] = False
@@ -126,8 +140,26 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
         t_cl.append(time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=conv))
 
     # Format results and print to the screen
-    fmt = "%d %-3d %8.3f %8.3f %8.3f %8.3f"
-    fmt += ' ' + ' '.join(['%8.3f'] * (len(t_cl)))
-    args = [img_size, krn_size, t_profile, t_brute, t_fft0, t_fft1]
-    args += t_cl
+    # If there was an error we print an "E%d" placeholder, which we expand
+    # at the end
+    fmt = "%d %-3d"
+    args = [img_size, krn_size]
+
+    all_times = [t_profile, t_brute, t_fft0, t_fft1] + t_cl
+    for t in all_times:
+        if t.error is None:
+            fmt += " %8.3f"
+            args.append(t.t)
+        else:
+            errno = "[E%d]" % len(errors)
+            fmt += " %8s"
+            args.append(errno)
+            errors.append(t.error)
+
     print(fmt % tuple(args))
+
+# Print all errors
+if errors:
+    print("\nError list:")
+    for i, e in enumerate(errors):
+        print("  E%d: %s" % (i, str(e)))
