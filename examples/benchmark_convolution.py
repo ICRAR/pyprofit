@@ -81,6 +81,7 @@ print('')
 # Get an float OpenCL environment for each of them
 # If the device supports double, get a double OpenCL environment as well
 sys.stdout.write('Getting an OpenCL environment for each of them now...')
+sys.stdout.flush()
 openclenvs = []
 for p, dev, double_support in all_cl_devs():
     openclenvs.append(pyprofit.openclenv(p, dev, False))
@@ -148,7 +149,7 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
     all_times = [t_profile, t_brute, t_fft0, t_fft1] + t_cl
     for t in all_times:
         if t.error is None:
-            fmt += " %8.3f"
+            fmt += " %8.4f"
             args.append(t.t)
         else:
             errno = "[E%d]" % len(errors)
