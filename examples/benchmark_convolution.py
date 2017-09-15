@@ -23,18 +23,39 @@
 import argparse
 import collections
 import itertools
+import math
 import random
 import sys
 import time
 
 import pyprofit
 
+
+def powers_of_to_up_to(n):
+    # Surely it's easier than this, but whatever...
+    last_exponent = int(math.floor(math.log(n, 2)))
+    powers = set([2**x for x in range(last_exponent + 1)] + [n])
+    powers = list(powers)
+    powers.sort()
+    return powers
+
 parser = argparse.ArgumentParser('')
 parser.add_argument('-n', '--niter', help='Number of iterations, defaults to 100',
                     type=int, default=100)
+parser.add_argument('-f', '--fft', help='Maximum FFT effort to test, defaults to 2',
+                    type=int, default=2)
+parser.add_argument('-t', '--omp_threads', help='Maximum OpenMP threads to use with FFT convolvers, defaults to 1',
+                    type=int, default=1)
 
 args = parser.parse_args()
 n_iter = args.niter
+max_fft_effort = args.fft
+# We test with OpenMP threads [1, 2, 4, 8, ... N]
+# If N is not a power of 2 it doesn't matter
+omp_threads = powers_of_to_up_to(args.omp_threads)
+
+
+
 print("Benchmark measuring with %d iterations" % (n_iter,))
 
 # What we use to time iterative executions
@@ -90,7 +111,9 @@ for p, dev, double_support in all_cl_devs():
 print(' done!')
 
 # Build up the title and display it
-title = "Img Krn    NoConv   Brute    FFT_0    FFT_1"
+title = "Img Krn    NoConv   Brute"
+for e, omp_t in itertools.product(range(max_fft_effort + 1), omp_threads):
+    title += ' %8s' % ('FFT_%d_%d' % (e, omp_t))
 for plat, dev, has_double_support in all_cl_devs():
     title += "  cl_{0}{1}_f Lcl_{0}{1}_f".format(plat, dev)
     if has_double_support:
@@ -118,8 +141,14 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
 
     # Create all required convolvers
     brute_convolver = create_convolver('brute force', width=img_size, height=img_size, psf=krns[krn_size])
-    fft0_convolver = create_convolver('FFT (effort = 0)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='fft', fft_effort=0)
-    fft1_convolver = create_convolver('FFT (effort = 1)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='fft', fft_effort=1)
+
+    # FFT convolvers use different efforts and OpenMP thread
+    fft_convolvers = []
+    for e, omp_t in itertools.product(range(max_fft_effort + 1), omp_threads):
+        conv = create_convolver('FFT (effort = %d, omp_threads = %d)' % (e, omp_t),
+                                width=img_size, height=img_size, psf=krns[krn_size],
+                                convolver_type='fft', fft_effort=e, omp_threads=omp_t)
+        fft_convolvers.append(conv)
 
     # cl_convolvers include normal and local CL convolvers, in the correct order
     cl_convolvers = []
@@ -133,12 +162,9 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
     profiles['sersic'][0]['convolve'] = True
 
     # ... and convolve with each of them!
-    t_brute = time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=brute_convolver)
-    t_fft0 = time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=fft0_convolver)
-    t_fft1 = time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=fft1_convolver)
-    t_cl = []
-    for conv in cl_convolvers:
-        t_cl.append(time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=conv))
+    times = []
+    for conv in [brute_convolver] + fft_convolvers + cl_convolvers:
+        times.append(time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=conv))
 
     # Format results and print to the screen
     # If there was an error we print an "E%d" placeholder, which we expand
@@ -146,7 +172,7 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
     fmt = "%d %-3d"
     args = [img_size, krn_size]
 
-    all_times = [t_profile, t_brute, t_fft0, t_fft1] + t_cl
+    all_times = [t_profile] + times
     for t in all_times:
         if t.error is None:
             fmt += " %8.4f"
