@@ -46,6 +46,8 @@ parser.add_argument('-f', '--fft', help='Maximum FFT effort to test, defaults to
                     type=int, default=2)
 parser.add_argument('-t', '--omp_threads', help='Maximum OpenMP threads to use with FFT convolvers, defaults to 1',
                     type=int, default=1)
+parser.add_argument('-r', '--reuse_psf', help='Measure PSF reusage (in FFT convolvers). Defaults to no',
+                    action='store_true', default=False)
 
 args = parser.parse_args()
 n_iter = args.niter
@@ -53,6 +55,7 @@ max_fft_effort = args.fft
 # We test with OpenMP threads [1, 2, 4, 8, ... N]
 # If N is not a power of 2 it doesn't matter
 omp_threads = powers_of_to_up_to(args.omp_threads)
+reuse = (False, True) if args.reuse_psf else (False,)
 
 
 
@@ -111,13 +114,15 @@ for p, dev, double_support in all_cl_devs():
 print(' done!')
 
 # Build up the title and display it
-title = "Img Krn    NoConv   Brute"
-for e, omp_t in itertools.product(range(max_fft_effort + 1), omp_threads):
-    title += ' %8s' % ('FFT_%d_%d' % (e, omp_t))
+title = "Img Krn     NoConv      Brute"
+for e, omp_t, r in itertools.product(range(max_fft_effort + 1), omp_threads, reuse):
+    title += ' %10s' % ('FFT_%d_%d_%s' % (e, omp_t, "Y" if r else "N"))
 for plat, dev, has_double_support in all_cl_devs():
-    title += "  cl_{0}{1}_f Lcl_{0}{1}_f".format(plat, dev)
+    title += ' %10s' % ('cl_%d%d_f' % (plat, dev))
+    title += ' %10s' % ('Lcl_%d%d_f' % (plat, dev))
     if has_double_support:
-        title += "  cl_{0}{1}_d Lcl_{0}{1}_d".format(plat, dev)
+        title += ' %10s' % ('cl_%d%d_d' % (plat, dev))
+        title += ' %10s' % ('Lcl_%d%d_d' % (plat, dev))
 print('\n' + title)
 
 
@@ -144,10 +149,11 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
 
     # FFT convolvers use different efforts and OpenMP thread
     fft_convolvers = []
-    for e, omp_t in itertools.product(range(max_fft_effort + 1), omp_threads):
-        conv = create_convolver('FFT (effort = %d, omp_threads = %d)' % (e, omp_t),
-                                width=img_size, height=img_size, psf=krns[krn_size],
-                                convolver_type='fft', fft_effort=e, omp_threads=omp_t)
+    for e, omp_t, r in itertools.product(range(max_fft_effort + 1), omp_threads, reuse):
+        label = 'FFT (effort = %d, omp_threads = %d, reuse = %s)' % (e, omp_t, "Yes" if r else "No")
+        conv = create_convolver(label, width=img_size, height=img_size, psf=krns[krn_size],
+                                convolver_type='fft', fft_effort=e, omp_threads=omp_t,
+                                reuse_psf_fft=r)
         fft_convolvers.append(conv)
 
     # cl_convolvers include normal and local CL convolvers, in the correct order
@@ -175,11 +181,11 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
     all_times = [t_profile] + times
     for t in all_times:
         if t.error is None:
-            fmt += " %8.4f"
+            fmt += " %10.4f"
             args.append(t.t)
         else:
             errno = "[E%d]" % len(errors)
-            fmt += " %8s"
+            fmt += " %10s"
             args.append(errno)
             errors.append(t.error)
 
