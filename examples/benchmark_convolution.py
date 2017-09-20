@@ -34,7 +34,7 @@ import pyprofit
 def powers_of_to_up_to(n):
     # Surely it's easier than this, but whatever...
     last_exponent = int(math.floor(math.log(n, 2)))
-    powers = set([2**x for x in range(last_exponent + 1)] + [n])
+    powers = set([2**x for x in range(1, last_exponent + 1)] + [n])
     powers = list(powers)
     powers.sort()
     return powers
