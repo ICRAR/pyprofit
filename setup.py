@@ -39,7 +39,7 @@ from setuptools.command.build_ext import build_ext
 # Versions of libprofit against which this extension works
 # None signifies an open limit
 #
-libprofit_versions = ((1, 5),)
+libprofit_versions = ((1, 5, 1),)
 
 class mute_compiler(object):
 
@@ -141,7 +141,7 @@ def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
         version = check_libprofit_version(header)
         ver_str = '.'.join(map(str, version))
         distutils.log.debug("-- Found libprofit version %s in %s" % (ver_str, header))
-        if version[:2] in libprofit_versions:
+        if version in libprofit_versions:
             distutils.log.info("-- Found libprofit headers for version %s", ver_str)
             incdir = i
             break
