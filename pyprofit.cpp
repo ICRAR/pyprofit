@@ -116,13 +116,13 @@ static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
 typedef struct {
     PyObject_HEAD
     std::shared_ptr<OpenCL_env> env;
-} OpenclEnv;
+} PyOpenCLEnv;
 
 
 /*
  * __init__, destructor
  */
-static int openclenv_init(OpenclEnv *self, PyObject *args, PyObject *kwargs) {
+static int openclenv_init(PyOpenCLEnv *self, PyObject *args, PyObject *kwargs) {
 
 	unsigned int plat_idx, dev_idx;
 	PyObject *use_double_o;
@@ -150,7 +150,7 @@ static int openclenv_init(OpenclEnv *self, PyObject *args, PyObject *kwargs) {
 	return 0;
 }
 
-static void openclenv_dealloc(OpenclEnv *self) {
+static void openclenv_dealloc(PyOpenCLEnv *self) {
 	self->env.reset();
 	Py_TYPE(self)->tp_free((PyObject*)self);
 }
@@ -158,7 +158,7 @@ static void openclenv_dealloc(OpenclEnv *self) {
 /*
  * openclenv object type
  */
-static PyTypeObject OpenclEnv_Type = {
+static PyTypeObject PyOpenCLEnv_Type = {
 #if PY_MAJOR_VERSION >= 3
 	PyVarObject_HEAD_INIT(NULL, 0)
 #else
@@ -166,7 +166,7 @@ static PyTypeObject OpenclEnv_Type = {
 	0,                             /*ob_size*/
 #endif
 	"pyprofit.openclenv",          /*tp_name*/
-	sizeof(OpenclEnv),             /*tp_basicsize*/
+	sizeof(PyOpenCLEnv),             /*tp_basicsize*/
 };
 #endif /* PROFIT_OPENCL */
 
@@ -448,21 +448,21 @@ static double *_read_psf_from_model(PyObject *model_dict, unsigned int *psf_widt
 typedef struct {
     PyObject_HEAD
     std::shared_ptr<Convolver> convolver;
-} ConvolverPtr;
+} PyConvolver;
 
 
 /*
  * destructor
  */
-static void convolverptr_dealloc(ConvolverPtr *self) {
+static void convolverptr_dealloc(PyConvolver *self) {
 	self->convolver.reset();
 	Py_TYPE(self)->tp_free((PyObject*)self);
 }
 
 /*
- * ConvolverPtr object type
+ * PyConvolver object type
  */
-static PyTypeObject ConvolverPtr_Type = {
+static PyTypeObject PyConvolver_Type = {
 #if PY_MAJOR_VERSION >= 3
 	PyVarObject_HEAD_INIT(NULL, 0)
 #else
@@ -470,7 +470,7 @@ static PyTypeObject ConvolverPtr_Type = {
 	0,                             /*ob_size*/
 #endif
 	"pyprofit.convolver",          /*tp_name*/
-	sizeof(ConvolverPtr),          /*tp_basicsize*/
+	sizeof(PyConvolver),          /*tp_basicsize*/
 };
 
 
@@ -553,16 +553,16 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 #endif /* PROFIT_FFTW */
 #ifdef PROFIT_OPENCL
 	if( p_openclenv != NULL ) {
-		if( !PyObject_TypeCheck(p_openclenv, &OpenclEnv_Type) ) {
+		if( !PyObject_TypeCheck(p_openclenv, &PyOpenCLEnv_Type) ) {
 			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
 		}
-		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
+		PyOpenCLEnv *openclenv = reinterpret_cast<PyOpenCLEnv *>(p_openclenv);
 		conv_prefs.opencl_env = openclenv->env;
 	}
 #endif /* PROFIT_OPENCL */
 
 
-	PyObject *convolver_ptr = PyObject_CallObject((PyObject *)&ConvolverPtr_Type, NULL);
+	PyObject *convolver_ptr = PyObject_CallObject((PyObject *)&PyConvolver_Type, NULL);
 	if (!convolver_ptr) {
 		PYPROFIT_RAISE("Couldn't allocate memory for new convolver");
 	}
@@ -570,7 +570,7 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	std::string error;
 	Py_BEGIN_ALLOW_THREADS
 	try {
-		((ConvolverPtr *)convolver_ptr)->convolver = create_convolver(convolver_type, conv_prefs);
+		((PyConvolver *)convolver_ptr)->convolver = create_convolver(convolver_type, conv_prefs);
 	} catch (std::exception &e) {
 		// can't PyErr_SetString directly here because we don't have the GIL
 		error = e.what();
@@ -655,10 +655,10 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	/* Assign the OpenCL environment to the model */
 	PyObject *p_openclenv = PyDict_GetItemString(model_dict, "openclenv");
 	if( p_openclenv != NULL and p_openclenv != Py_None ) {
-		if( !PyObject_TypeCheck(p_openclenv, &OpenclEnv_Type) ) {
+		if( !PyObject_TypeCheck(p_openclenv, &PyOpenCLEnv_Type) ) {
 			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
 		}
-		OpenclEnv *openclenv = reinterpret_cast<OpenclEnv *>(p_openclenv);
+		PyOpenCLEnv *openclenv = reinterpret_cast<PyOpenCLEnv *>(p_openclenv);
 		m.opencl_env = openclenv->env;
 	}
 #endif /* PROFIT_OPENCL */
@@ -673,7 +673,7 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	PyObject *convolver = PyDict_GetItemString(model_dict, "convolver");
 	if (convolver) {
-		m.convolver = ((ConvolverPtr *)convolver)->convolver;
+		m.convolver = ((PyConvolver *)convolver)->convolver;
 	}
 
 	/* Read the profiles */
@@ -775,27 +775,27 @@ MOD_INIT(pyprofit)
 		return MOD_VAL(NULL);
 	}
 
-	ConvolverPtr_Type.tp_flags = Py_TPFLAGS_DEFAULT;
-	ConvolverPtr_Type.tp_doc = "A model convolver";
-	ConvolverPtr_Type.tp_new = PyType_GenericNew;
-	ConvolverPtr_Type.tp_dealloc = (destructor)convolverptr_dealloc;
-	ConvolverPtr_Type.tp_init = (initproc)NULL;
-	if( PyType_Ready(&ConvolverPtr_Type) < 0 ) {
+	PyConvolver_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+	PyConvolver_Type.tp_doc = "A model convolver";
+	PyConvolver_Type.tp_new = PyType_GenericNew;
+	PyConvolver_Type.tp_dealloc = (destructor)convolverptr_dealloc;
+	PyConvolver_Type.tp_init = (initproc)NULL;
+	if( PyType_Ready(&PyConvolver_Type) < 0 ) {
 		return MOD_VAL(NULL);
 	}
-	Py_INCREF(&ConvolverPtr_Type);
+	Py_INCREF(&PyConvolver_Type);
 
 #ifdef PROFIT_OPENCL
-	OpenclEnv_Type.tp_flags = Py_TPFLAGS_DEFAULT;
-	OpenclEnv_Type.tp_doc = "An OpenCL environment";
-	OpenclEnv_Type.tp_new = PyType_GenericNew;
-	OpenclEnv_Type.tp_dealloc = (destructor)openclenv_dealloc;
-	OpenclEnv_Type.tp_init = (initproc)openclenv_init;
-	if( PyType_Ready(&OpenclEnv_Type) < 0 ) {
+	PyOpenCLEnv_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+	PyOpenCLEnv_Type.tp_doc = "An OpenCL environment";
+	PyOpenCLEnv_Type.tp_new = PyType_GenericNew;
+	PyOpenCLEnv_Type.tp_dealloc = (destructor)openclenv_dealloc;
+	PyOpenCLEnv_Type.tp_init = (initproc)openclenv_init;
+	if( PyType_Ready(&PyOpenCLEnv_Type) < 0 ) {
 		return MOD_VAL(NULL);
 	}
-	Py_INCREF(&OpenclEnv_Type);
-	PyModule_AddObject(m, "openclenv", (PyObject *)&OpenclEnv_Type);
+	Py_INCREF(&PyOpenCLEnv_Type);
+	PyModule_AddObject(m, "openclenv", (PyObject *)&PyOpenCLEnv_Type);
 #endif /* PROFIT_OPENCL */
 
 #ifdef PROFIT_FFTW
