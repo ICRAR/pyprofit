@@ -39,7 +39,7 @@ from setuptools.command.build_ext import build_ext
 # Versions of libprofit against which this extension works
 # None signifies an open limit
 #
-libprofit_versions = ((1, 5, 1), (1, 5, 2))
+libprofit_versions = ((1, 5, 1), (1, 5, 2), (1, 5, 3))
 
 class mute_compiler(object):
 
@@ -270,7 +270,7 @@ pyprofit_ext = Extension('pyprofit', language='c++', sources = ['pyprofit.cpp'])
 
 setup(
       name='pyprofit',
-      version='1.5.0',
+      version='1.5.2',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
