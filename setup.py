@@ -39,7 +39,7 @@ from setuptools.command.build_ext import build_ext
 # Versions of libprofit against which this extension works
 # None signifies an open limit
 #
-libprofit_versions = ((1, 5, 1),)
+libprofit_versions = ((1, 5, 1), (1, 5, 2))
 
 class mute_compiler(object):
 
