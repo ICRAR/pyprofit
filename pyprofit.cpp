@@ -544,10 +544,10 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	conv_prefs.krn_width = psf_width;
 	conv_prefs.krn_height = psf_height;
 
+#ifdef PROFIT_FFTW
 #ifdef PROFIT_OPENMP
 	conv_prefs.plan_omp_threads = omp_threads;
 #endif /* PROFIT_OPENMP */
-#ifdef PROFIT_FFTW
 	conv_prefs.reuse_krn_fft = static_cast<bool>(PyObject_IsTrue(reuse_psf_fft));
 	conv_prefs.effort = FFTPlan::effort_t(fft_effort);
 #endif /* PROFIT_FFTW */
