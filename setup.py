@@ -228,6 +228,7 @@ class configure(setuptools.Command):
         info = has_libprofit(user_incdirs, user_libdirs, extra_compile_args)
         if not info:
             msg = ("No libprofit installation found on your system.\n\n"
+                   "Supported versions are: %s\n\n"
                    "You can specify a libprofit installation directory via the LIBPROFIT_HOME "
                    "environment variable.\n"
                    "Additionally, you can also use the LIBPROFIT_INCIDR and LIBPROFIT_LIBDIR "
@@ -235,6 +236,7 @@ class configure(setuptools.Command):
                    "to point separately to the headers and library directories respectivelly\n\n"
                    "For example:\n\n"
                    "LIBPROFIT_HOME=~/local python setup.py install")
+            msg = msg % ', '.join('.'.join(map(str, v)) for v in libprofit_versions)
             raise distutils.errors.DistutilsPlatformError(msg)
         distutils.log.info("-- Found libprofit headers/lib")
 
