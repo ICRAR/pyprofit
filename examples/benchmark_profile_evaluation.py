@@ -27,6 +27,7 @@ import math
 import sys
 import time
 
+import numpy as np
 import pyprofit
 
 def powers_of_to_up_to(n):
@@ -46,14 +47,10 @@ parser.add_argument('-H', '--height', help='Image height',
                     type=int, default=200)
 parser.add_argument('-t', '--omp_threads', help='Maximum OpenMP threads to use for profile evaluation, defaults to 1',
                     type=int, default=1)
-parser.add_argument('-N', '--num_nsers', help='Number of sersic indexes to sample, defaults to 10',
-                    type=int, default=10)
-parser.add_argument('-a', '--num_angs', help='Number of angles to sample, defaults to 10',
-                    type=int, default=10)
-parser.add_argument('-A', '--num_axrats', help='Number of axis ratios to sample, defaults to 4',
-                    type=int, default=4)
-parser.add_argument('-r', '--num_res', help='Number of Re values sample, defaults to 5',
-                    type=int, default=5)
+parser.add_argument('-N', '--nsers', help='Sersic indexes to sample, defaults to 1,8,10', default=None)
+parser.add_argument('-a', '--angs', help='Number of angles to sample, defaults to 0,90,10', default=None)
+parser.add_argument('-A', '--axrats', help='Number of axis ratios to sample, defaults to 0.1,1,4', default=None)
+parser.add_argument('-r', '--res', help='Number of Re values sample, defaults to 0,width/2,5', default=None)
 
 args = parser.parse_args()
 n_iter = args.niter
@@ -61,28 +58,23 @@ width = args.width
 height = args.height
 omp_threads = powers_of_to_up_to(args.omp_threads)
 
-num_nsers = args.num_nsers
-num_angs = args.num_angs
-num_axrats = args.num_axrats
-num_res = args.num_res
 
-print("Benchmark measuring profile image of %d x %d with %d iterations" % (width, height, n_iter,))
-print("\n%d combinations to be benchmarked" % (num_nsers * num_angs * num_axrats * num_res))
-print("Parameter ranges: ")
-
-def define_parameter_range(name, n, f):
-    values = [f(x) for x in range(n)]
+def define_parameter_range(name, spec):
+    Min, Max, n = map(float, spec.split(','))
+    diff = Max - Min
+    step = diff/(n - 1)
+    values = np.arange(Min, Max + step, step)
     print("%d %s: %r" % (n, name, values))
     return values
 
-# nser in range [1, 8]
-# ang in range [0, 90]
-# axrat in range (0, 1]
-# re in range (0, width/2]
-nsers = define_parameter_range('nser', num_nsers, lambda x: (x * 7. / (num_nsers - 1)) + 1)
-angs = define_parameter_range('angs', num_angs, lambda x: x * 90. / (num_angs - 1))
-axrats = define_parameter_range('axrats', num_axrats, lambda x: (x + 1) / float(num_axrats))
-res = define_parameter_range('res', num_res, lambda x: (x + 1) * width / (2 * num_res))
+nsers = define_parameter_range('nser', args.nsers or '1,12,10')
+angs = define_parameter_range('angs', args.angs or '0,90,10')
+axrats = define_parameter_range('axrats', args.axrats or '0.1,1,4')
+res = define_parameter_range('res', args.res or '0,%f,5' % (width/2.,))
+
+print("Benchmark measuring profile image of %d x %d with %d iterations" % (width, height, n_iter,))
+print("\n%d combinations to be benchmarked" % (len(nsers) * len(angs) * len(axrats) * len(res)))
+print("Parameter ranges: ")
 
 # What we use to time iterative executions
 timing_result = collections.namedtuple('timing_result', 't error')
