@@ -36,6 +36,8 @@ def powers_of_to_up_to(n):
     powers = set([2**x for x in range(1, last_exponent + 1)] + [n])
     powers = list(powers)
     powers.sort()
+    if 1 in powers:
+        powers.remove(1)
     return powers
 
 parser = argparse.ArgumentParser('')
@@ -48,9 +50,10 @@ parser.add_argument('-H', '--height', help='Image height',
 parser.add_argument('-t', '--omp_threads', help='Maximum OpenMP threads to use for profile evaluation, defaults to 1',
                     type=int, default=1)
 parser.add_argument('-N', '--nsers', help='Sersic indexes to sample, defaults to 1,8,10', default=None)
-parser.add_argument('-a', '--angs', help='Number of angles to sample, defaults to 0,90,10', default=None)
-parser.add_argument('-A', '--axrats', help='Number of axis ratios to sample, defaults to 0.1,1,4', default=None)
-parser.add_argument('-r', '--res', help='Number of Re values sample, defaults to 0,width/2,5', default=None)
+parser.add_argument('-a', '--angs', help='Angles to sample, defaults to 0,45,4', default=None)
+parser.add_argument('-A', '--axrats', help='Axis ratios to sample, defaults to 0.1,1,4', default=None)
+parser.add_argument('-r', '--res', help='Re values sample, defaults to 0,width/2,5', default=None)
+parser.add_argument('-b', '--boxes', help='Boxing values to sample, defaults to 0.5,0.5,3', default=None)
 
 args = parser.parse_args()
 n_iter = args.niter
@@ -64,16 +67,22 @@ def define_parameter_range(name, spec):
     diff = Max - Min
     step = diff/(n - 1)
     values = np.arange(Min, Max + step, step)
+
+    # Avoid rounding errors
+    if values[-1] != Max:
+        values[-1] = Max
+
     print("%d %s: %r" % (n, name, values))
     return values
 
 nsers = define_parameter_range('nser', args.nsers or '1,12,10')
-angs = define_parameter_range('angs', args.angs or '0,90,10')
+angs = define_parameter_range('angs', args.angs or '0,45,4')
 axrats = define_parameter_range('axrats', args.axrats or '0.1,1,4')
 res = define_parameter_range('res', args.res or '0,%f,5' % (width/2.,))
+boxes = define_parameter_range('boxes', args.boxes or '-0.5,0.5,3')
 
 print("Benchmark measuring profile image of %d x %d with %d iterations" % (width, height, n_iter,))
-print("\n%d combinations to be benchmarked" % (len(nsers) * len(angs) * len(axrats) * len(res)))
+print("\n%d combinations to be benchmarked" % (len(nsers) * len(angs) * len(axrats) * len(res) * len(boxes)))
 print("Parameter ranges: ")
 
 # What we use to time iterative executions
@@ -131,16 +140,24 @@ eval_args = [{}]
 eval_args += [{'openclenv': clenv} for clenv in openclenvs]
 eval_args += [{'omp_threads': t} for t in omp_threads]
 
-parameters = (zip(labels, eval_args), nsers, angs, axrats, res)
-times = collections.defaultdict(list)
-for label_and_evalargs, nser, ang, axrat, re in itertools.product(*parameters):
-    sersic_profile['nser'] = nser
-    sersic_profile['ang'] = ang
-    sersic_profile['axrat'] = axrat
-    sersic_profile['re'] = re
 
+parameters = (nsers, angs, axrats, res, boxes)
+times = collections.defaultdict(list)
+for label_and_evalargs in zip(labels, eval_args):
     label, args = label_and_evalargs
-    times[label].append(time_me(width=width, height=height, profiles=profiles, **args))
+    sys.stdout.write('Evaluating %s...' % label)
+    sys.stdout.flush()
+
+    start = time.time()
+    for nser, ang, axrat, re, box in itertools.product(*parameters):
+        sersic_profile['nser'] = nser
+        sersic_profile['ang'] = ang
+        sersic_profile['axrat'] = axrat
+        sersic_profile['re'] = re
+        sersic_profile['box'] = box
+        times[label].append(time_me(width=width, height=height, profiles=profiles, **args))
+
+    print(" done! (%.3f [s])" % (time.time() - start))
 
 # Print values and exit
 errors = []
