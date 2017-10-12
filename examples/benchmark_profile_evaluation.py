@@ -63,7 +63,10 @@ omp_threads = powers_of_to_up_to(args.omp_threads)
 
 
 def define_parameter_range(name, spec):
-    Min, Max, n = map(float, spec.split(','))
+    spec_elements = map(float, spec.split(','))
+    if len(spec_elements) in (1, 2):
+        return spec_elements
+    Min, Max, n = spec_elements
     diff = Max - Min
     step = diff/(n - 1)
     values = np.arange(Min, Max + step, step)
@@ -162,14 +165,19 @@ for label_and_evalargs in zip(labels, eval_args):
 # Print values and exit
 errors = []
 def value(x):
+    # Normal values (from the parameter space)
+    if not hasattr(x, 'error'):
+        return "%6.2f" % x
+    # Measurements (which might be errors)
     if x.error:
         ret = "[E%d]" % len(errors)
         errors.append(x.error)
         return "%8s" % ret
     return "%8.4f" % x.t
 
-print(" ".join(["%8s" % (l) for l in labels]))
-for vals in zip(*[times[x] for x in labels]):
+print(" ".join(['nser  ', '   ang', ' axrat', '   re', '   box'] + ["%8s" % (l) for l in labels]))
+for vals in zip(itertools.product(*parameters), *[times[x] for x in labels]):
+    vals = list(vals[0]) + list(vals[1:])
     print(" ".join(value(x) for x in vals))
 
 if errors:
