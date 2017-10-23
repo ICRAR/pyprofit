@@ -39,7 +39,7 @@ from setuptools.command.build_ext import build_ext
 # Versions of libprofit against which this extension works
 # None signifies an open limit
 #
-libprofit_versions = ((1, 5, 1), (1, 5, 2), (1, 5, 3))
+libprofit_versions = ((1, 5, 1), (1, 5, 2), (1, 5, 3), (1, 6, 0))
 
 class mute_compiler(object):
 
@@ -118,12 +118,31 @@ def get_cpp11_stdspec():
 
 
 def check_libprofit_version(h):
+
+    major, minor, patch = -1, -1, -1
     with open(h, 'rt') as h:
         h = h.read()
+
+        # libprofit < 1.6 defined PROFIT_VERSION only
         m = re.search(r'#define\WPROFIT_VERSION\W"(\d\.\d\.\d)"', h)
         if m:
             return tuple(map(int, m.group(1).split('.')))
-    return None
+
+        # libprofit >= 1.6 defines different macros for major, minor and patch version
+        m = re.search(r'#define\WPROFIT_VERSION_MAJOR\W(\d)', h)
+        if m:
+            major = int(m.group(1))
+        m = re.search(r'#define\WPROFIT_VERSION_MINOR\W(\d)', h)
+        if m:
+            minor = int(m.group(1))
+        m = re.search(r'#define\WPROFIT_VERSION_PATCH\W(\d)', h)
+        if m:
+            patch = int(m.group(1))
+
+    if major == -1 or minor == -1 or patch == -1:
+        return None
+
+    return major, minor, patch
 
 def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
 

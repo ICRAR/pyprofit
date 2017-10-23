@@ -544,10 +544,21 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	conv_prefs.krn_width = psf_width;
 	conv_prefs.krn_height = psf_height;
 
-#ifdef PROFIT_FFTW
+	// In 1.6 the plan_omp_threads attribute name was renamed to omp_threads
+	// Also, the libprofit's version was signaled by the single PROFIT_VERSION macro,
+	// which in 1.6 has been broken down into individual pieces
+	// (which is how we identify 1.5 versions)
 #ifdef PROFIT_OPENMP
+#if defined(PROFIT_VERSION)
+	// libprofit <1.6
 	conv_prefs.plan_omp_threads = omp_threads;
+#else
+	// libprofit >=1.6
+	conv_prefs.omp_threads = omp_threads;
+#endif
 #endif /* PROFIT_OPENMP */
+
+#ifdef PROFIT_FFTW
 	conv_prefs.reuse_krn_fft = static_cast<bool>(PyObject_IsTrue(reuse_psf_fft));
 	conv_prefs.effort = FFTPlan::effort_t(fft_effort);
 #endif /* PROFIT_FFTW */
