@@ -24,7 +24,7 @@ before_install:
  - sudo apt-get install libgsl0-dev opencl-headers
  - git clone https://github.com/ICRAR/libprofit
  - cd libprofit
- - git checkout v1.5.3
+ - git checkout v1.6.0
  - mkdir build
  - cd build
  - cmake .. -DCMAKE_CXX_FLAGS="-std=c++0x" -DCMAKE_INSTALL_PREFIX=${LIBPROFIT_HOME}
