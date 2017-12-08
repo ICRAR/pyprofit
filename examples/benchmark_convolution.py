@@ -111,7 +111,9 @@ for p, dev, double_support in all_cl_devs():
 print(' done!')
 
 # Build up the title and display it
-title = "Img Krn     NoConv      Brute"
+title = "Img Krn     NoConv   BruteOld"
+for omp_t in omp_threads:
+    title += ' %10s' % ('Brute_%d' % (omp_t,))
 for e, omp_t, r in itertools.product(range(max_fft_effort + 1), omp_threads, reuse):
     title += ' %10s' % ('FFT_%d_%d_%s' % (e, omp_t, "Y" if r else "N"))
 for plat, dev, has_double_support in all_cl_devs():
@@ -142,7 +144,15 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
         continue
 
     # Create all required convolvers
-    brute_convolver = create_convolver('brute force', width=img_size, height=img_size, psf=krns[krn_size])
+    oldbrute_convolver = create_convolver('brute force (old)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='brute-old')
+
+    # New brute convolvers with OpenMP threads
+    brute_convolvers = []
+    for omp_t in omp_threads:
+        label = 'brute force (omp_threads = %d)' % (omp_t,)
+        conv = create_convolver(label, width=img_size, height=img_size, psf=krns[krn_size],
+                                convolver_type='brute', omp_threads=omp_t)
+        brute_convolvers.append(conv)
 
     # FFT convolvers use different efforts and OpenMP thread
     fft_convolvers = []
@@ -166,7 +176,7 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
 
     # ... and convolve with each of them!
     times = []
-    for conv in [brute_convolver] + fft_convolvers + cl_convolvers:
+    for conv in [oldbrute_convolver] + brute_convolvers + fft_convolvers + cl_convolvers:
         times.append(time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size], convolver=conv))
 
     # Format results and print to the screen
