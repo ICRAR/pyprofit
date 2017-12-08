@@ -75,13 +75,10 @@ def time_me(**kwargs):
         return timing_result(0, e)
 
 # The profile and image/kernel sizes used throughout the benchmark
+# We use a sky profile because it takes virtually no time to run
 img_sizes= (100, 150, 200, 300, 400, 800)
 krn_sizes = (25, 50, 100, 200)
-profiles = {
-    'sersic': [
-        {'xcen': 50, 'ycen': 50, 'nser': 9.23, 'ang': 23.6, 'axrat': 0.3, 'mag': 10, 'rough': 0, 're': 50}
-    ]
-}
+profiles = {'sky': [{'bg': 10e-6}]}
 
 # Initialize the kernels for all sizes with random data
 krns = {}
@@ -163,9 +160,9 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
         cl_convolvers.append(create_convolver('OpenCL (local)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl-local', openclenv=clenv))
 
     # Basic profile calculation time
-    profiles['sersic'][0]['convolve'] = False
+    profiles['sky'][0]['convolve'] = False
     t_profile = time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size])
-    profiles['sersic'][0]['convolve'] = True
+    profiles['sky'][0]['convolve'] = True
 
     # ... and convolve with each of them!
     times = []
