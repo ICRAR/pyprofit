@@ -37,9 +37,9 @@ from setuptools.command.build_ext import build_ext
 
 #
 # Versions of libprofit against which this extension works
-# None signifies an open limit
+# Format is (major, minor, patch, suffix)
 #
-libprofit_versions = ((1, 5, 1), (1, 5, 2), (1, 5, 3), (1, 6, 0))
+libprofit_versions = ((1, 5, 1, None), (1, 5, 2, None), (1, 5, 3, None), (1, 6, 0, None))
 
 class mute_compiler(object):
 
@@ -119,7 +119,7 @@ def get_cpp11_stdspec():
 
 def check_libprofit_version(h):
 
-    major, minor, patch = -1, -1, -1
+    major, minor, patch, suffix = -1, -1, -1, None
     with open(h, 'rt') as h:
         h = h.read()
 
@@ -129,6 +129,7 @@ def check_libprofit_version(h):
             return tuple(map(int, m.group(1).split('.')))
 
         # libprofit >= 1.6 defines different macros for major, minor and patch version
+        # libprofit >= 1.7 defines also a macro for a version suffix
         m = re.search(r'#define\WPROFIT_VERSION_MAJOR\W(\d)', h)
         if m:
             major = int(m.group(1))
@@ -138,11 +139,20 @@ def check_libprofit_version(h):
         m = re.search(r'#define\WPROFIT_VERSION_PATCH\W(\d)', h)
         if m:
             patch = int(m.group(1))
+        m = re.search(r'#define\WPROFIT_VERSION_SUFFIX\W"(\w+)"', h)
+        if m:
+            suffix = m.group(1)
 
     if major == -1 or minor == -1 or patch == -1:
         return None
 
-    return major, minor, patch
+    return major, minor, patch, suffix
+
+def version_as_str(version):
+    ver_str = '.'.join(map(str, version[:3]))
+    if version[3] is not None:
+        ver_str += '-' + version[3]
+    return ver_str
 
 def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
 
@@ -152,21 +162,27 @@ def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
         compiler_incdirs = c.include_dirs
 
     incdir = None
+    found = []
     for i in compiler_incdirs + user_incdirs:
         header = os.path.join(i, 'profit', 'config.h')
         if not os.path.exists(header):
             continue
         distutils.log.debug("-- Found libprofit headers in %s, checking version" % header)
         version = check_libprofit_version(header)
-        ver_str = '.'.join(map(str, version))
-        distutils.log.debug("-- Found libprofit version %s in %s" % (ver_str, header))
+        distutils.log.debug("-- Found libprofit version %s in %s" % (version_as_str(version), header))
+        found.append((header, version))
         if version in libprofit_versions:
-            distutils.log.info("-- Found libprofit headers for version %s", ver_str)
+            distutils.log.info("-- Found libprofit headers for version %s", version_as_str(version))
             incdir = i
             break
 
     if not incdir:
-        distutils.log.error("-- no suitable libprofit headers not found")
+        msg = "-- no suitable libprofit headers not found"
+        if found:
+            msg += '. The following headers were found though:\n'
+            msg += '\n'.join('   %s (%s)' % (h, version_as_str(v)) for h, v in found)
+            msg += '\n'
+        distutils.log.error(msg)
         return None
 
     source_fname = tempfile.mktemp(suffix='.cpp')
@@ -255,7 +271,7 @@ class configure(setuptools.Command):
                    "to point separately to the headers and library directories respectivelly\n\n"
                    "For example:\n\n"
                    "LIBPROFIT_HOME=~/local python setup.py install")
-            msg = msg % ', '.join('.'.join(map(str, v)) for v in libprofit_versions)
+            msg = msg % ', '.join(version_as_str(v) for v in libprofit_versions)
             raise distutils.errors.DistutilsPlatformError(msg)
         distutils.log.info("-- Found libprofit headers/lib")
 
