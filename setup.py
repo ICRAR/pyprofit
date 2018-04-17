@@ -266,7 +266,7 @@ class configure(setuptools.Command):
                    "Supported versions are: %s\n\n"
                    "You can specify a libprofit installation directory via the LIBPROFIT_HOME "
                    "environment variable.\n"
-                   "Additionally, you can also use the LIBPROFIT_INCIDR and LIBPROFIT_LIBDIR "
+                   "Additionally, you can also use the LIBPROFIT_INCDIR and LIBPROFIT_LIBDIR "
                    "environment variables\n"
                    "to point separately to the headers and library directories respectivelly\n\n"
                    "For example:\n\n"
