@@ -158,14 +158,20 @@ def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
 
     # Manually check the headers are actually there, and that the version is
     # one we support
-    with mute_compiler() as c:
-        compiler_incdirs = c.include_dirs
+    builtin_dirs = ['/usr', '/usr/local']
+    if sys.platform == "darwin":
+        builtin_dirs += ['/opt/local']
+    builtin_incdirs = [x + '/include' for x in builtin_dirs]
+    builtin_libdirs = [x + '/lib' for x in builtin_dirs]
+    builtin_libdirs += [x + '/lib64' for x in builtin_dirs]
 
     incdir = None
     found = []
-    for i in compiler_incdirs + user_incdirs:
+    distutils.log.debug('-- Looking for libprofit headers under: %r', user_incdirs + builtin_incdirs)
+    for i in user_incdirs + builtin_incdirs:
         header = os.path.join(i, 'profit', 'config.h')
         if not os.path.exists(header):
+            distutils.log.debug('-- No libprofit headers under %s', header)
             continue
         distutils.log.debug("-- Found libprofit headers in %s, checking version" % header)
         version = check_libprofit_version(header)
@@ -200,18 +206,21 @@ def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
         except:
             return False
 
-        for l in c.library_dirs + user_libdirs:
+        for l in user_libdirs + builtin_libdirs:
             try:
                 c.link_executable(object_fnames, 'test', library_dirs=[l])
-                distutils.log.info("-- Found libprofit version in %s" % l)
                 libdir = l
                 break
             except:
                 pass
+            finally:
+                os.unlink('test')
 
     if not libdir:
         distutils.log.error("-- libprofit library not found")
         return None
+    else:
+        distutils.log.info("-- Found libprofit under %s", libdir)
 
     return incdir, libdir
 
