@@ -58,7 +58,6 @@ static PyObject *profit_error;
 
 /* OpenCL-related methods/object */
 static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
-#ifdef PROFIT_OPENCL
 
 	std::map<int, OpenCL_plat_info> clinfo;
 	try {
@@ -101,18 +100,14 @@ static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
 	}
 
 	return p_clinfo;
-
-#endif /* PROFIT_OPENCL */
-	PYPROFIT_RAISE("No OpenCL support in this pyprofit, recompile if necessary");
 }
 
-#ifdef PROFIT_OPENCL
 /*
  * openclenv object structure
  */
 typedef struct {
     PyObject_HEAD
-    std::shared_ptr<OpenCL_env> env;
+	OpenCLEnvPtr env;
 } PyOpenCLEnv;
 
 
@@ -165,7 +160,6 @@ static PyTypeObject PyOpenCLEnv_Type = {
 	"pyprofit.openclenv",          /*tp_name*/
 	sizeof(PyOpenCLEnv),             /*tp_basicsize*/
 };
-#endif /* PROFIT_OPENCL */
 
 
 /* Utility methods */
@@ -307,6 +301,9 @@ static void _item_to_sky_profile(std::shared_ptr<Profile> &profile, PyObject *it
 	read_double(profile, item, "bg");
 }
 
+static void _item_to_null_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
+}
+
 static void _item_to_psf_profile(std::shared_ptr<Profile> &profile, PyObject *item) {
 	read_double(profile, item, "xcen");
 	read_double(profile, item, "ycen");
@@ -364,6 +361,10 @@ static void _read_psf_profiles(Model &model, PyObject *profiles_dict) {
 
 static void _read_sky_profiles(Model &model, PyObject *profiles_dict) {
 	_read_profiles(model, profiles_dict, "sky", &_item_to_sky_profile);
+}
+
+static void _read_null_profiles(Model &model, PyObject *profiles_dict) {
+	_read_profiles(model, profiles_dict, "null", &_item_to_null_profile);
 }
 
 static void _read_sersic_profiles(Model &model, PyObject *profiles_dict) {
@@ -477,53 +478,22 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	const char *convolver_type = "brute";
 	PyObject *psf_p;
 
-#ifdef PROFIT_OPENMP
 	unsigned int omp_threads = 1;
-#endif /* PROFIT_OPENMP */
-#ifdef PROFIT_FFTW
 	PyObject *reuse_psf_fft = Py_False;
 	unsigned int fft_effort = 0;
-#endif /* PROFIT_FFTW */
-#ifdef PROFIT_OPENCL
 	PyObject *p_openclenv = NULL;
-#endif /* PROFIT_OPENCL */
 
-	const char * fmt = "IIO|z"
-#ifdef PROFIT_OPENMP
-	"I"
-#endif /* PROFIT_OPENMP */
-#ifdef PROFIT_FFTW
-	"OI"
-#endif /* PROFIT_FFTW */
-#ifdef PROFIT_OPENCL
-	"O"
-#endif /* PROFIT_OPENCL */
-	":make_convolver";
+	const char * fmt = "IIO|zIOIO:make_convolver";
 
-	const char *kwlist[] = {"width", "height", "psf", "convolver_type",
-#ifdef PROFIT_OPENMP
-		"omp_threads",
-#endif /* PROFIT_OPENMP */
-#ifdef PROFIT_FFTW
-		"reuse_psf_fft", "fft_effort",
-#endif /* PROFIT_FFTW */
-#ifdef PROFIT_OPENCL
-	    "openclenv",
-#endif /* PROFIT_OPENCL */
-		NULL};
+	const char *kwlist[] = {
+	    "width", "height", "psf", "convolver_type",
+	    "omp_threads", "reuse_psf_fft", "fft_effort", "openclenv",
+	    NULL};
 
 	int res = PyArg_ParseTupleAndKeywords(args, kwargs, fmt, const_cast<char **>(kwlist),
-	                                      &width, &height, &psf_p, &convolver_type
-#ifdef PROFIT_OPENMP
-	                                      ,&omp_threads
-#endif /* PROFIT_OPENMP */
-#ifdef PROFIT_FFTW
-	                                      ,&reuse_psf_fft, &fft_effort
-#endif /* PROFIT_FFTW */
-#ifdef PROFIT_OPENCL
-	                                      ,&p_openclenv
-#endif /* PROFIT_OPENCL */
-	          );
+	                                      &width, &height, &psf_p, &convolver_type,
+	                                      &omp_threads, &reuse_psf_fft, &fft_effort,
+	                                      &p_openclenv);
 
 	if (!res) {
 		return NULL;
@@ -536,30 +506,12 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	}
 
 	ConvolverCreationPreferences conv_prefs;
-	conv_prefs.src_width = width;
-	conv_prefs.src_height = height;
-	conv_prefs.krn_width = psf_width;
-	conv_prefs.krn_height = psf_height;
-
-	// In 1.6 the plan_omp_threads attribute name was renamed to omp_threads
-	// Also, the libprofit's version was signaled by the single PROFIT_VERSION macro,
-	// which in 1.6 has been broken down into individual pieces
-	// (which is how we identify 1.5 versions)
-#ifdef PROFIT_OPENMP
-#if defined(PROFIT_VERSION)
-	// libprofit <1.6
-	conv_prefs.plan_omp_threads = omp_threads;
-#else
-	// libprofit >=1.6
+	conv_prefs.src_dims = {width, height};
+	conv_prefs.krn_dims = {psf_width, psf_height};
 	conv_prefs.omp_threads = omp_threads;
-#endif
-#endif /* PROFIT_OPENMP */
 
-#ifdef PROFIT_FFTW
 	conv_prefs.reuse_krn_fft = static_cast<bool>(PyObject_IsTrue(reuse_psf_fft));
-	conv_prefs.effort = FFTPlan::effort_t(fft_effort);
-#endif /* PROFIT_FFTW */
-#ifdef PROFIT_OPENCL
+	conv_prefs.effort = effort_t(fft_effort);
 	if( p_openclenv != NULL ) {
 		if( !PyObject_TypeCheck(p_openclenv, &PyOpenCLEnv_Type) ) {
 			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
@@ -567,8 +519,6 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 		PyOpenCLEnv *openclenv = reinterpret_cast<PyOpenCLEnv *>(p_openclenv);
 		conv_prefs.opencl_env = openclenv->env;
 	}
-#endif /* PROFIT_OPENCL */
-
 
 	PyObject *convolver_ptr = PyObject_CallObject((PyObject *)&PyConvolver_Type, NULL);
 	if (!convolver_ptr) {
@@ -641,25 +591,29 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 
 	/* Create and initialize the model */
 	Model m;
-	m.width = width;
-	m.height = height;
-	READ_DOUBLE(model_dict, "scale_x", m.scale_x);
-	READ_DOUBLE(model_dict, "scale_y", m.scale_y);
+	m.set_dimensions({static_cast<unsigned int>(width), static_cast<unsigned int>(height)});
+	double scale_x = 1, scale_y = 1;
+	READ_DOUBLE(model_dict, "scale_x", scale_x);
+	READ_DOUBLE(model_dict, "scale_y", scale_y);
+	m.set_image_pixel_scale({scale_x, scale_y});
 	if( psf ) {
-		m.psf = std::vector<double>(psf, psf + (psf_width * psf_height));
-		m.psf_width = psf_width;
-		m.psf_height = psf_height;
-		READ_DOUBLE(model_dict, "psf_scale_x", m.psf_scale_x);
-		READ_DOUBLE(model_dict, "psf_scale_y", m.psf_scale_y);
+		auto psf_im = Image(std::vector<double>(psf, psf + (psf_width * psf_height)), psf_width, psf_height);
+		m.set_psf(std::move(psf_im));
+		double psf_scale_x = 1, psf_scale_y = 1;
+		READ_DOUBLE(model_dict, "psf_scale_x", psf_scale_x);
+		READ_DOUBLE(model_dict, "psf_scale_y", psf_scale_y);
+		m.set_psf_pixel_scale({psf_scale_x, psf_scale_y});
 		delete [] psf;
 	}
 	if( calcmask ) {
-		m.calcmask = std::vector<bool>(calcmask, calcmask + (width * height));
+		auto mask = Mask(std::vector<bool>(calcmask, calcmask + (width * height)), width, height);
+		m.set_mask(std::move(mask));
 		delete [] calcmask;
 	}
-	READ_DOUBLE(model_dict, "magzero", m.magzero);
+	double magzero = 0;
+	READ_DOUBLE(model_dict, "magzero", magzero);
+	m.set_magzero(magzero);
 
-#ifdef PROFIT_OPENCL
 	/* Assign the OpenCL environment to the model */
 	PyObject *p_openclenv = PyDict_GetItemString(model_dict, "openclenv");
 	if( p_openclenv != NULL and p_openclenv != Py_None ) {
@@ -667,21 +621,18 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 			PYPROFIT_RAISE("Given openclenv is not of type pyprofit.openclenv");
 		}
 		PyOpenCLEnv *openclenv = reinterpret_cast<PyOpenCLEnv *>(p_openclenv);
-		m.opencl_env = openclenv->env;
+		m.set_opencl_env(openclenv->env);
 	}
-#endif /* PROFIT_OPENCL */
 
-#ifdef PROFIT_OPENMP
 	/* Assign requested number of OpenMP threads */
 	PyObject *p_omp_threads = PyDict_GetItemString(model_dict, "omp_threads");
 	if( p_omp_threads != NULL ) {
-		m.omp_threads = (unsigned int)PyInt_AsUnsignedLongMask(p_omp_threads);
+		m.set_omp_threads((unsigned int)PyInt_AsUnsignedLongMask(p_omp_threads));
 	}
-#endif /* PROFIT_OPENMP */
 
 	PyObject *convolver = PyDict_GetItemString(model_dict, "convolver");
 	if (convolver) {
-		m.convolver = ((PyConvolver *)convolver)->convolver;
+		m.set_convolver(((PyConvolver *)convolver)->convolver);
 	}
 
 	/* Read the profiles */
@@ -692,17 +643,19 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	_read_coresersic_profiles(m, profiles_dict);
 	_read_brokenexp_profiles(m, profiles_dict);
 	_read_sky_profiles(m, profiles_dict);
+	_read_null_profiles(m, profiles_dict);
 	_read_psf_profiles(m, profiles_dict);
 
 	/*
 	 * Go, Go, Go!
 	 * This might take a few [ms], so we release the GIL
 	 */
-	std::vector<double> image;
+	Image image;
+	Point offset;
 	std::string error;
 	Py_BEGIN_ALLOW_THREADS
 	try {
-		image = m.evaluate();
+		image = m.evaluate(offset);
 	} catch (std::exception &e) {
 		// can't PyErr_SetString directly here because we don't have the GIL
 		error = e.what();
@@ -714,26 +667,39 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 		return NULL;
 	}
 
-	/* Copy resulting image into a 2-D tuple */
-	PyObject *image_tuple = PyTuple_New(m.height);
-	if( image_tuple == NULL ) {
-		PYPROFIT_RAISE("Couldn't create return tuple");
+	/*
+	 * We return a 2-element tuple.
+	 * Element 0 is a 2-D tuple with the image values
+	 * Element 1 is a 2-element tuple with the offset
+	 */
+	auto im_dims = image.getDimensions();
+	PyObject *image_tuple = PyTuple_New(im_dims.y);
+	PyObject *offset_tuple = PyTuple_New(2);
+	PyObject *return_tuple = PyTuple_New(2);
+	if (image_tuple == NULL || offset_tuple == NULL || return_tuple == NULL) {
+		PYPROFIT_RAISE("Couldn't create return tuples");
 	}
 
-	for(i=0; i!=m.height; i++) {
-		PyObject *row_tuple = PyTuple_New(m.width);
+	/* Copy resulting image into a 2-D tuple */
+	for(i=0; i!=im_dims.y; i++) {
+		PyObject *row_tuple = PyTuple_New(im_dims.x);
 		if( row_tuple == NULL ) {
 			PYPROFIT_RAISE("Couldn't create row tuple");
 		}
-		for(j=0; j!=m.width; j++) {
-			PyObject *val = PyFloat_FromDouble(image[i*m.width + j]);
+		for(j=0; j!=im_dims.x; j++) {
+			PyObject *val = PyFloat_FromDouble(image[i*im_dims.x + j]);
 			PyTuple_SetItem(row_tuple, j, val);
 		}
 		PyTuple_SetItem(image_tuple, i, row_tuple);
 	}
 
-	/* Clean up and return */
-	return image_tuple;
+	/* Copy offset into another 2-element tuple */
+	PyTuple_SetItem(offset_tuple, 0, PyFloat_FromDouble(offset.x));
+	PyTuple_SetItem(offset_tuple, 1, PyFloat_FromDouble(offset.y));
+
+	PyTuple_SetItem(return_tuple, 0, image_tuple);
+	PyTuple_SetItem(return_tuple, 1, offset_tuple);
+	return return_tuple;
 }
 
 /*
@@ -768,6 +734,10 @@ MOD_INIT(pyprofit)
 {
 	PyObject *m;
 
+	// TODO: add error checking for these
+	profit::init();
+	Py_AtExit(profit::finish);
+
 	MOD_DEF(m, "pyprofit", "libprofit wrapper for python", pyprofit_methods);
 	if( m == NULL ) {
 		return MOD_VAL(NULL);
@@ -793,26 +763,19 @@ MOD_INIT(pyprofit)
 	}
 	Py_INCREF(&PyConvolver_Type);
 
-#ifdef PROFIT_OPENCL
-	PyOpenCLEnv_Type.tp_flags = Py_TPFLAGS_DEFAULT;
-	PyOpenCLEnv_Type.tp_doc = "An OpenCL environment";
-	PyOpenCLEnv_Type.tp_new = PyType_GenericNew;
-	PyOpenCLEnv_Type.tp_dealloc = (destructor)openclenv_dealloc;
-	PyOpenCLEnv_Type.tp_init = (initproc)openclenv_init;
-	if( PyType_Ready(&PyOpenCLEnv_Type) < 0 ) {
-		return MOD_VAL(NULL);
+	if (profit::has_opencl()) {
+		PyOpenCLEnv_Type.tp_flags = Py_TPFLAGS_DEFAULT;
+		PyOpenCLEnv_Type.tp_doc = "An OpenCL environment";
+		PyOpenCLEnv_Type.tp_new = PyType_GenericNew;
+		PyOpenCLEnv_Type.tp_dealloc = (destructor)openclenv_dealloc;
+		PyOpenCLEnv_Type.tp_init = (initproc)openclenv_init;
+		if( PyType_Ready(&PyOpenCLEnv_Type) < 0 ) {
+			return MOD_VAL(NULL);
+		}
+		Py_INCREF(&PyOpenCLEnv_Type);
+		PyModule_AddObject(m, "openclenv", (PyObject *)&PyOpenCLEnv_Type);
 	}
-	Py_INCREF(&PyOpenCLEnv_Type);
-	PyModule_AddObject(m, "openclenv", (PyObject *)&PyOpenCLEnv_Type);
-#endif /* PROFIT_OPENCL */
 
-#ifdef PROFIT_FFTW
-	try {
-		FFTPlan::initialize();
-	} catch (const std::exception &e) {
-		return MOD_VAL(m);
-	}
-#endif /* PROFIT_FFTW */
 	return MOD_VAL(m);
 }
 

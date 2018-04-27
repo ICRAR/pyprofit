@@ -75,10 +75,11 @@ def time_me(**kwargs):
         return timing_result(0, e)
 
 # The profile and image/kernel sizes used throughout the benchmark
-# We use a sky profile because it takes virtually no time to run
+# We use a null profile because it takes no time to run
 img_sizes= (100, 150, 200, 300, 400, 800)
 krn_sizes = (25, 50, 100, 200)
-profiles = {'sky': [{'bg': 10e-6}]}
+null_prof = {'convolve': False}
+profiles = {'null': [null_prof]}
 
 # Initialize the kernels for all sizes with random data
 krns = {}
@@ -118,10 +119,8 @@ for e, omp_t, r in itertools.product(range(max_fft_effort + 1), omp_threads, reu
     title += ' %10s' % ('FFT_%d_%d_%s' % (e, omp_t, "Y" if r else "N"))
 for plat, dev, has_double_support in all_cl_devs():
     title += ' %10s' % ('cl_%d%d_f' % (plat, dev))
-    title += ' %10s' % ('Lcl_%d%d_f' % (plat, dev))
     if has_double_support:
         title += ' %10s' % ('cl_%d%d_d' % (plat, dev))
-        title += ' %10s' % ('Lcl_%d%d_d' % (plat, dev))
 print('\n' + title)
 
 
@@ -163,16 +162,15 @@ for img_size, krn_size in itertools.product(img_sizes, krn_sizes):
                                 reuse_psf_fft=r)
         fft_convolvers.append(conv)
 
-    # cl_convolvers include normal and local CL convolvers, in the correct order
+    # cl_convolver includes only the normal CL convolvers
     cl_convolvers = []
     for clenv in openclenvs:
         cl_convolvers.append(create_convolver('OpenCL', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl', openclenv=clenv))
-        cl_convolvers.append(create_convolver('OpenCL (local)', width=img_size, height=img_size, psf=krns[krn_size], convolver_type='opencl-local', openclenv=clenv))
 
     # Basic profile calculation time
-    profiles['sky'][0]['convolve'] = False
+    null_prof['convolve'] = False
     t_profile = time_me(profiles=profiles, width=img_size, height=img_size, psf=krns[krn_size])
-    profiles['sky'][0]['convolve'] = True
+    null_prof['convolve'] = True
 
     # ... and convolve with each of them!
     times = []
