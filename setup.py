@@ -211,12 +211,11 @@ def has_libprofit(user_incdirs, user_libdirs, extra_compile_args):
         for l in user_libdirs + builtin_libdirs:
             try:
                 c.link_executable(object_fnames, 'test', library_dirs=[l])
+                os.unlink('test')
                 libdir = l
                 break
             except:
                 pass
-            finally:
-                os.unlink('test')
 
     if not libdir:
         distutils.log.error("-- libprofit library not found")
