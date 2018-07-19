@@ -317,7 +317,7 @@ pyprofit_ext = Extension('pyprofit', language='c++', sources = ['pyprofit.cpp'])
 
 setup(
       name='pyprofit',
-      version='1.7.1',
+      version='1.7.2',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
