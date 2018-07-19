@@ -55,6 +55,19 @@ static PyObject *profit_error;
 		return NULL; \
 	} while (0)
 
+/* Utility macros */
+#define __PASTE(x, y, z) x ## y ## z
+#define __MAKE_VERSION(x, y, z) __PASTE(x, y , z)
+#define __PROFIT_VERSION __MAKE_VERSION(PROFIT_VERSION_MAJOR, PROFIT_VERSION_MINOR, PROFIT_VERSION_PATCH)
+#define VERSION_GREATER_EQUAL(maj, min, patch) __PROFIT_VERSION >= maj##min##patch
+
+/* Is return_finesampled supported? */
+#if VERSION_GREATER_EQUAL(1, 7, 1)
+#define PROFIT_HAS_RETURN_FINESAMPLED
+#else
+#undef PROFIT_HAS_RETURN_FINESAMPLED
+#endif
+
 
 /* OpenCL-related methods/object */
 static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
@@ -633,6 +646,18 @@ static PyObject *pyprofit_make_model(PyObject *self, PyObject *args) {
 	PyObject *convolver = PyDict_GetItemString(model_dict, "convolver");
 	if (convolver) {
 		m.set_convolver(((PyConvolver *)convolver)->convolver);
+	}
+
+	/* Read finesampling information */
+	tmp = PyDict_GetItemString(model_dict, "finesampling");
+	if (tmp != NULL) {
+		m.set_finesampling(PyInt_AsLong(tmp));
+#ifdef PROFIT_HAS_RETURN_FINESAMPLED
+		tmp = PyDict_GetItemString(model_dict, "return_finesampled");
+		if (tmp != NULL) {
+			m.set_return_finesampled(PyObject_IsTrue(tmp));
+		}
+#endif
 	}
 
 	/* Read the profiles */

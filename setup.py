@@ -41,6 +41,8 @@ from setuptools.command.build_ext import build_ext
 #
 libprofit_versions = (
     (1, 7, 0, None),
+    (1, 7, 1, None),
+    (1, 7, 2, None),
 )
 
 class mute_compiler(object):
