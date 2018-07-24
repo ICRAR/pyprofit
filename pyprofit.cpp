@@ -68,6 +68,12 @@ static PyObject *profit_error;
 #undef PROFIT_HAS_RETURN_FINESAMPLED
 #endif
 
+/* Init/finish diagnose messages supported? */
+#if VERSION_GREATER_EQUAL(1, 7, 3)
+#define PROFIT_HAS_DIAGNOSE_MESSAGES
+#else
+#undef PROFIT_HAS_DIAGNOSE_MESSAGES
+#endif
 
 /* OpenCL-related methods/object */
 static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
@@ -755,13 +761,44 @@ static struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT, "pyprofit", "libpr
 
 extern "C" {
 
+void _pyprofit_finish()
+{
+	profit::finish();
+#ifdef PROFIT_HAS_DIAGNOSE_MESSAGES
+	auto finish_diagnose = profit::finish_diagnose();
+	if (!finish_diagnose.empty()) {
+		PySys_WriteStderr("%s\n", finish_diagnose.c_str());
+	}
+#endif // PROFIT_HAS_DIAGNOSE_MESSAGES}
+}
+
 MOD_INIT(pyprofit)
 {
 	PyObject *m;
 
-	// TODO: add error checking for these
-	profit::init();
-	Py_AtExit(profit::finish);
+	// Init libprofit and handle diagnose message if required
+	auto success = profit::init();
+#ifdef PROFIT_HAS_DIAGNOSE_MESSAGES
+	auto init_diagnose = profit::init_diagnose();
+#endif // PROFIT_HAS_DIAGNOSE_MESSAGES
+	if (!success) {
+#ifdef PROFIT_HAS_DIAGNOSE_MESSAGES
+		std::ostringstream os;
+		os << "Error while initializing libprofit: " << init_diagnose;
+		PyErr_SetString(PyExc_ImportError, os.str().c_str());
+#else
+		PyErr_SetString(PyExc_ImportError, "Error while initializing libprofit");
+#endif // PROFIT_HAS_DIAGNOSE_MESSAGES
+		return MOD_VAL(NULL);
+	}
+#ifdef PROFIT_HAS_DIAGNOSE_MESSAGES
+	else if (!init_diagnose.empty()) {
+		std::ostringstream os;
+		os << "Warning while initializing libprofit: " << init_diagnose;
+		PySys_WriteStderr("%s\n", os.str().c_str());
+	}
+#endif
+	Py_AtExit(_pyprofit_finish);
 
 	MOD_DEF(m, "pyprofit", "libprofit wrapper for python", pyprofit_methods);
 	if( m == NULL ) {
