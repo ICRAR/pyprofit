@@ -44,6 +44,7 @@ libprofit_versions = (
     (1, 7, 1, None),
     (1, 7, 2, None),
     (1, 7, 3, None),
+    (1, 7, 4, None),
 )
 
 class mute_compiler(object):
@@ -318,7 +319,7 @@ pyprofit_ext = Extension('pyprofit', language='c++', sources = ['pyprofit.cpp'])
 
 setup(
       name='pyprofit',
-      version='1.7.3',
+      version='1.7.4',
       description='Libprofit wrapper for Python',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
