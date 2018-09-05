@@ -63,7 +63,7 @@ omp_threads = powers_of_to_up_to(args.omp_threads)
 
 
 def define_parameter_range(name, spec):
-    spec_elements = map(float, spec.split(','))
+    spec_elements = list(map(float, spec.split(',')))
     if len(spec_elements) in (1, 2):
         return spec_elements
     Min, Max, n = spec_elements
@@ -78,11 +78,11 @@ def define_parameter_range(name, spec):
     print("%d %s: %r" % (n, name, values))
     return values
 
-nsers = define_parameter_range('nser', args.nsers or '1,12,10')
+nsers = define_parameter_range('nser', args.nsers or '0.5,16,10')
 angs = define_parameter_range('angs', args.angs or '0,45,4')
-axrats = define_parameter_range('axrats', args.axrats or '0.1,1,4')
-res = define_parameter_range('res', args.res or '0,%f,5' % (width/2.,))
-boxes = define_parameter_range('boxes', args.boxes or '-0.5,0.5,3')
+axrats = define_parameter_range('axrats', args.axrats or '0.1,1,5')
+res = define_parameter_range('res', args.res or '1,%f,10' % (width/2.,))
+boxes = define_parameter_range('boxes', args.boxes or '-1,1,5')
 
 print("Benchmark measuring profile image of %d x %d with %d iterations" % (width, height, n_iter,))
 print("\n%d combinations to be benchmarked" % (len(nsers) * len(angs) * len(axrats) * len(res) * len(boxes)))
