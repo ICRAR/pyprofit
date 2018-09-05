@@ -34,6 +34,9 @@ from setuptools import setup, Extension
 import setuptools
 from setuptools.command.build_ext import build_ext
 
+# TODO: use an explicit temporary directory, and delete it at the end of
+# everything
+
 
 #
 # Versions of libprofit against which this extension works
