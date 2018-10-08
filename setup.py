@@ -48,6 +48,8 @@ libprofit_versions = (
     (1, 7, 2, None),
     (1, 7, 3, None),
     (1, 7, 4, None),
+    (1, 8, 0, 'dev'),
+    (1, 8, 0, None),
 )
 
 class mute_compiler(object):
@@ -337,6 +339,7 @@ setup(
           "Programming Language :: Python :: 3.4",
           "Programming Language :: Python :: 3.5",
           "Programming Language :: Python :: 3.6",
+          "Programming Language :: Python :: 3.7",
           "Topic :: Scientific/Engineering :: Astronomy"
       ],
       ext_modules = [pyprofit_ext],
