@@ -20,3 +20,9 @@ For instruction on how to compile and instal *libprofit* please read
 and thus can be easily installed via::
 
  pip install pyprofit
+
+If you need to point to a specific libprofit installation
+set the ``LIBPROFIT_HOME`` environment variable to point to it,
+e.g.::
+
+ LIBPROFIT_HOME=/opt/software/libprofit/1.8.0/ pip install pyprofit
