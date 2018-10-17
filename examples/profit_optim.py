@@ -66,7 +66,8 @@ def to_pyprofit_image(params, data, use_mask=True):
                    }
     if use_mask:
         profit_model['calcmask'] = data.calcregion
-    return allparams, np.array(pyprofit.make_model(profit_model))
+    image, _ = pyprofit.make_model(profit_model)
+    return allparams, np.array(image)
 
 
 def profit_like_model(params, data):
