@@ -73,11 +73,11 @@ def prior_func(s):
 # Initial set of parameters
 names  = ['%s.%s' % (profile, prop) for prop,profile in itertools.product(('xcen','ycen','mag','re','nser','ang','axrat','box'), ('sersic1','sersic2'))]
 model0 = np.array((84.8832, 84.8832, 94.5951, 94.5951, 16.83217, 16.83217, 7.0574, 14.1148, 4.3776, 1.0000, 140.8191, 140.8191, 1.,    0.4891, 0,     0))
-tofit  = np.array((True,    False,   True,    False,   True,     True,     True,   True,    True,   False,  True,     True,     False, True,   True,  False))
-tolog  = np.array((False,   False,   False,   False,   False,    False,    True,   True,    True,   True,   False,    False,    True,  True,   False, False))
-sigmas = np.array((2,       2,       2,       2,       5,        5,        1,      1,       1,      1,      30,       30,       0.3,   0.3,    0.3,   0.3))
-lowers = np.array((0,       0,       0,       0,       10,       10,       0,      0,       -1,     -1,     -180,     -180,     -1,    -1,     -1,    -1))
-uppers = np.array((1e3,     1e3,     1e3,     1e3,     30,       30,       2,      2,       1.3,    1.3,    360,      360,      0,     0,      1,     1))
+tofit  = np.array((True,  False, True,  False, True,  True,  True, True, True, False, True,  True,  False, True,  True,  False))
+tolog  = np.array((False, False, False, False, False, False, True, True, True, True,  False, False, True,  True,  False, False))
+sigmas = np.array((2,     2,     2,     2,     5,     5,     1,    1,       1,    1,     30,    30,   0.3,   0.3,   0.3,   0.3))
+lowers = np.array((0,     0,     0,     0,     10,    10,    0,    0,      -1,   -1,   -180,  -180,    -1,    -1,    -1,    -1))
+uppers = np.array((1e3,   1e3,   1e3,   1e3,   30,    30,    2,    2,     1.3,  1.3,    360,   360, -0.01, -0.01,     1,     1))
 priors = np.array([prior_func(s) for s in sigmas])
 
 # The images used in this example are not part of our repository
