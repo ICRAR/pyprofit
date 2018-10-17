@@ -30,7 +30,7 @@ import itertools
 import os
 import sys
 
-import pyfits
+from astropy.io import fits
 from scipy import optimize
 from scipy import stats
 
@@ -89,7 +89,7 @@ def fits_data(fname):
         with contextlib.closing(urllib.urlopen(url)) as im, open(fname, "wb") as f:
             for data in iter(functools.partial(im.read, 4096), b''):
                 f.write(data)
-    return np.array(pyfits.getdata(fname))
+    return np.array(fits.getdata(fname))
 
 basename = 'G265911'
 image = fits_data(basename + 'fitim.fits')
