@@ -51,6 +51,7 @@ libprofit_versions = (
     (1, 8, 0, 'dev'),
     (1, 8, 0, None),
     (1, 8, 1, None),
+    (1, 8, 2, None),
 )
 
 class mute_compiler(object):

@@ -75,6 +75,13 @@ static PyObject *profit_error;
 #undef PROFIT_HAS_DIAGNOSE_MESSAGES
 #endif
 
+/* instruction set convolution preference supported? */
+#if VERSION_GREATER_EQUAL(1, 8, 2)
+#define PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+#else
+#undef PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+#endif
+
 /* OpenCL-related methods/object */
 static PyObject *pyprofit_opencl_info(PyObject *self, PyObject *args) {
 
@@ -501,18 +508,32 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	PyObject *reuse_psf_fft = Py_False;
 	unsigned int fft_effort = 0;
 	PyObject *p_openclenv = NULL;
+#ifdef PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	unsigned int instruction_set = int(simd_instruction_set::AUTO);
+#endif // PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
 
-	const char * fmt = "IIO|zIOIO:make_convolver";
+	const char * fmt = "IIO|zIOIO"
+#ifdef PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	    "I"
+#endif // PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	    ":make_convolver";
 
 	const char *kwlist[] = {
 	    "width", "height", "psf", "convolver_type",
 	    "omp_threads", "reuse_psf_fft", "fft_effort", "openclenv",
+#ifdef PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	    "instruction_set",
+#endif
 	    NULL};
 
 	int res = PyArg_ParseTupleAndKeywords(args, kwargs, fmt, const_cast<char **>(kwlist),
 	                                      &width, &height, &psf_p, &convolver_type,
 	                                      &omp_threads, &reuse_psf_fft, &fft_effort,
-	                                      &p_openclenv);
+	                                      &p_openclenv
+#ifdef PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	                                      , &instruction_set
+#endif // PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	                                      );
 
 	if (!res) {
 		return NULL;
@@ -528,6 +549,9 @@ static PyObject *pyprofit_make_convolver(PyObject *self, PyObject *args, PyObjec
 	conv_prefs.src_dims = {width, height};
 	conv_prefs.krn_dims = {psf_width, psf_height};
 	conv_prefs.omp_threads = omp_threads;
+#ifdef PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
+	conv_prefs.instruction_set = simd_instruction_set(instruction_set);
+#endif // PROFIT_HAS_INSTRUCTION_SET_PREFERENCE
 
 	conv_prefs.reuse_krn_fft = static_cast<bool>(PyObject_IsTrue(reuse_psf_fft));
 	conv_prefs.effort = effort_t(fft_effort);
