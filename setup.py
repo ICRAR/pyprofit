@@ -324,10 +324,16 @@ class _build_ext(build_ext):
 # It is enriched during the 'configure' step
 pyprofit_ext = Extension('pyprofit', language='c++', sources = ['pyprofit.cpp'])
 
+this_dir = os.path.dirname(__file__)
+with open(os.path.join(this_dir, 'README.rst'), 'rt') as f:
+    long_description = f.read()
+
 setup(
       name='pyprofit',
       version='1.8.1',
       description='Libprofit wrapper for Python',
+      long_description=long_description,
+      long_description_content_type='text/x-rst',
       author='Rodrigo Tobar',
       author_email='rtobar@icrar.org',
       url='https://github.com/ICRAR/pyprofit',
