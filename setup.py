@@ -333,7 +333,7 @@ with open(os.path.join(this_dir, 'README.rst'), 'rt') as f:
 
 setup(
       name='pyprofit',
-      version='1.8.2',
+      version='1.9.0',
       description='Libprofit wrapper for Python',
       long_description=long_description,
       long_description_content_type='text/x-rst',
