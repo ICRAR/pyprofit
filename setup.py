@@ -278,7 +278,12 @@ class configure(setuptools.Command):
             msg = "\n\nNo C/C++ compiler with C++11 support found." + \
                   "Use the CC environment variable to specify a different compiler if you have one.\n" + \
                   "You can also try setting the PYPROFIT_CXX11 environment variable with the necessary switches " + \
-                  "(e.g., PYPROFIT_CXX11='-std c++11')"
+                  "(e.g., PYPROFIT_CXX11='-std c++11')\n" + \
+                  "\n" + \
+                  "Additionally, use CFLAGS to pass any other compilation flag you might require." + \
+                  "\n" + \
+                  "If using recent MacOS versions, and this package is failing to compile, you might probably need " + \
+                  "to pass -stdlib=libc++ via CFLAGS (or PYPROFIT_CX11, but not recommended)."
             raise distutils.errors.DistutilsPlatformError(msg)
         distutils.log.info("-- Using '%s' to enable C++11 support", stdspec)
         extra_compile_args = [stdspec] if stdspec else []
